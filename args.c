@@ -7,7 +7,7 @@
 int init_gts_args(gts_args_t *gts_args){
     
     gts_args->port = 6666;
-    gts_args->server = strdup("127.0.0.1");
+    gts_args->server = strdup("192.168.1.147");
     
     if (gts_args->mode == GTS_MODE_SERVER){
         gts_args->shell_up = strdup("./samples/server_up.sh");
@@ -23,7 +23,7 @@ int init_gts_args(gts_args_t *gts_args){
         printf("unknow mode");
     }
     gts_args->header_key = (unsigned char*) malloc(8*sizeof(char));
-    gts_args->header_key = "ABCD1234";
+    gts_args->header_key = strdup("1234ABCD");
     
     gts_args->GTS_header_len = 32;
     gts_args->ver_len = 1;
@@ -38,7 +38,6 @@ int init_gts_args(gts_args_t *gts_args){
     gts_args->udp_buf = malloc(gts_args->mtu + gts_args->GTS_header_len);
     gts_args->tun_buf = gts_args->udp_buf + gts_args->GTS_header_len;
     
-
     gts_args->remote_addr_len = sizeof(gts_args->remote_addr);
     
     return 1;

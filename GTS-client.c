@@ -1,6 +1,21 @@
 #include "args.h"
 #include "action.h"
 
+int check_header(char *token, unsigned char *buf, key_set* key_sets){
+    unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
+    process_message(data_block, buf, key_sets, DECRYPTION_MODE);
+    data_block[8] = 0;
+    if (data_block[0] != 1){
+        printf("version check failed");
+        return 1;
+    }else if(strcmp(token, data_block+1) != 0){
+        printf("unknow token");
+        return 2;
+    }else{
+        return 0;
+    }
+}
+
 int main(){
     //init gts_args
     gts_args_t GTS_args;
@@ -11,8 +26,10 @@ int main(){
     int nonce_fd = open("/dev/urandom", O_RDONLY);
     
     init_gts_args(gts_args);
-    set_GTS_header(gts_args);
-    
+    key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
+    generate_sub_keys(gts_args->header_key, key_sets);
+    unsigned char* encrypted_header = encrypt_GTS_header(gts_args, key_sets);
+        
     // init GTSc_tun
     gts_args->tun = tun_create(gts_args->intf);
      if (gts_args->tun < 0){
@@ -26,7 +43,7 @@ int main(){
     gts_args->UDP_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); 
     
     fd_set readset;
-    while (1){
+    while (gts_args->ver == 1){
         printf("waiting data.....data length:");
         readset = init_select(gts_args);    //select udp_socket and tun
         
@@ -37,12 +54,18 @@ int main(){
                             gts_args->mtu + gts_args->GTS_header_len, 0,
                             (struct sockaddr*)&gts_args->remote_addr,
                             (socklen_t*)&gts_args->remote_addr_len);
+                            
+/*            if (check_header(gts_args->token, gts_args->udp_buf, key_sets) != 0){
+                continue;
+            }*/
             write(gts_args->tun, gts_args->tun_buf, length - gts_args->GTS_header_len);
             printf("%dbyte\n",length);
         }
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->tun_buf, gts_args->mtu);
-            read(nonce_fd, gts_args->udp_buf+8, gts_args->nonce_len);
+            memcpy(gts_args->udp_buf, encrypted_header, gts_args->ver_len + gts_args->token_len);
+            read(nonce_fd, gts_args->udp_buf + gts_args->ver_len + gts_args->token_len,gts_args->nonce_len);
+                
             sendto(gts_args->UDP_sock, gts_args->udp_buf,
                   length + gts_args->GTS_header_len, 0,
                   (struct sockaddr*)&gts_args->server_addr,

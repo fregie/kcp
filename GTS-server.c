@@ -7,9 +7,10 @@ int main() {
     gts_args_t *gts_args = &GTS_args;
     bzero(gts_args, sizeof(gts_args_t));
     gts_args->mode = GTS_MODE_SERVER;
-    init_gts_args(gts_args);
     
     int length; //length of buffer recieved
+    init_gts_args(gts_args);
+    
     //init UDP_sock and GTSs_tun
     gts_args->UDP_sock = init_UDP_socket(gts_args->server,gts_args->port);
     gts_args->tun = tun_create(gts_args->intf);
@@ -33,7 +34,7 @@ int main() {
                             (struct sockaddr*)&gts_args->remote_addr,
                             (socklen_t*)&gts_args->remote_addr_len);
             write(gts_args->tun, gts_args->tun_buf, length - gts_args->GTS_header_len);
-            printf("%dbyte\n",length);
+            printf("back:%dbyte\n",length);
         }
         // recv data from tun
         if (FD_ISSET(gts_args->tun, &readset)){
@@ -42,7 +43,7 @@ int main() {
                   length + gts_args->GTS_header_len, 0,
                   (struct sockaddr*)&gts_args->remote_addr,
                   (socklen_t)gts_args->remote_addr_len);
-            printf("%dbyte\n",length);
+            printf("to:%dbyte\n",length);
         }
         
     }
