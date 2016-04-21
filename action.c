@@ -62,7 +62,7 @@ fd_set init_select(gts_args_t *gts_args){
     FD_SET(gts_args->UDP_sock, &readset);
     max_fd = max(gts_args->tun, max_fd);
     max_fd = max(gts_args->UDP_sock, max_fd);
-    select(max_fd, &readset, NULL, NULL, NULL);
+    select(max_fd+1, &readset, NULL, NULL, NULL);
     return readset; 
 }
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-ip addr add 10.7.0.2 dev GTSc_tun
+ip addr add 10.7.0.2/24 dev GTSc_tun
 ip link set GTSc_tun mtu 1432
 ip link set GTSc_tun up
 

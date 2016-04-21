@@ -1,5 +1,12 @@
 #include "args.h"
 #include "action.h"
+#include <signal.h>
+
+
+static void sig_handler(int signo) {
+    system("sh ./samples/server_down.sh");
+    exit(0);
+}
 
 int main() {
     //init gts_args
@@ -9,8 +16,11 @@ int main() {
     gts_args->mode = GTS_MODE_SERVER;
     
     int length; //length of buffer recieved
+    int nonce_fd = open("/dev/urandom", O_RDONLY);
     init_gts_args(gts_args);
     
+    signal(SIGINT, sig_handler);
+    signal(SIGTERM, sig_handler);
     //init UDP_sock and GTSs_tun
     gts_args->UDP_sock = init_UDP_socket(gts_args->server,gts_args->port);
     gts_args->tun = tun_create(gts_args->intf);
@@ -21,8 +31,7 @@ int main() {
         system(gts_args->shell_up);
     }
     fd_set readset;
-    while (1)
-    {
+    while (gts_args->ver == 1){
         printf("start listening.....\n");
         readset = init_select(gts_args);    //select udp_socket and tun
         
@@ -39,6 +48,8 @@ int main() {
         // recv data from tun
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->tun_buf, gts_args->mtu);
+            read(nonce_fd, gts_args->udp_buf + gts_args->ver_len + gts_args->token_len, gts_args->nonce_len);
+ 
             sendto(gts_args->UDP_sock, gts_args->udp_buf,
                   length + gts_args->GTS_header_len, 0,
                   (struct sockaddr*)&gts_args->remote_addr,

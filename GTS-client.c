@@ -1,6 +1,13 @@
 #include "args.h"
 #include "action.h"
 
+#include <signal.h>
+
+static void sig_handler(int signo) {
+    system("sh ./samples/client_down.sh");
+    exit(0);
+}
+
 int check_header(char *token, unsigned char *buf, key_set* key_sets){
     unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
     process_message(data_block, buf, key_sets, DECRYPTION_MODE);
@@ -16,7 +23,7 @@ int check_header(char *token, unsigned char *buf, key_set* key_sets){
     }
 }
 
-int main(){
+int main(int argc, char **argv){
     //init gts_args
     gts_args_t GTS_args;
     gts_args_t *gts_args = &GTS_args;
@@ -25,11 +32,15 @@ int main(){
     int length;
     int nonce_fd = open("/dev/urandom", O_RDONLY);
     
-    init_gts_args(gts_args);
+    if (-1 == init_gts_args(gts_args)){
+        printf("init client failed!");
+    }
     key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
     generate_sub_keys(gts_args->header_key, key_sets);
     unsigned char* encrypted_header = encrypt_GTS_header(gts_args, key_sets);
-        
+    
+    signal(SIGINT, sig_handler);
+    signal(SIGTERM, sig_handler);
     // init GTSc_tun
     gts_args->tun = tun_create(gts_args->intf);
      if (gts_args->tun < 0){
@@ -55,9 +66,9 @@ int main(){
                             (struct sockaddr*)&gts_args->remote_addr,
                             (socklen_t*)&gts_args->remote_addr_len);
                             
-/*            if (check_header(gts_args->token, gts_args->udp_buf, key_sets) != 0){
-                continue;
-            }*/
+            // if (check_header(gts_args->token, gts_args->udp_buf, key_sets) != 0){
+            //     continue;
+            // }
             write(gts_args->tun, gts_args->tun_buf, length - gts_args->GTS_header_len);
             printf("%dbyte\n",length);
         }
@@ -76,6 +87,5 @@ int main(){
     
     close(gts_args->UDP_sock);
     close(nonce_fd);
-    free(gts_args);
     return 0;
 }
