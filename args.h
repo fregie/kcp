@@ -1,5 +1,8 @@
-#pragma once
+#ifndef _ARGS_H_
+#define _ARGS_H_
+
 #include "des.h"
+#include "cJSON.h"
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -29,7 +32,9 @@ typedef struct{
   gts_mode mode;
   uint16_t port;
   char *server;
+  char *password;
   char *shell_up;
+  char *shell_down;
   char *intf;
   int mtu;
   // declare fds
@@ -57,3 +62,5 @@ typedef struct{
 } gts_args_t;
 
 int init_gts_args(gts_args_t *gts_args);
+
+#endif
