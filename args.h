@@ -3,6 +3,7 @@
 
 #include "des.h"
 #include "cJSON.h"
+#include "log.h"
 
 #include <stdint.h>
 #include <sys/types.h>

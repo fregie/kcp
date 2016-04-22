@@ -74,9 +74,11 @@ int main(int argc, char **argv){
         }
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->tun_buf, gts_args->mtu);
+            //add encrypt header
             memcpy(gts_args->udp_buf, encrypted_header, gts_args->ver_len + gts_args->token_len);
+            //add random nonce
             read(nonce_fd, gts_args->udp_buf + gts_args->ver_len + gts_args->token_len,gts_args->nonce_len);
-                
+            
             sendto(gts_args->UDP_sock, gts_args->udp_buf,
                   length + gts_args->GTS_header_len, 0,
                   (struct sockaddr*)&gts_args->server_addr,

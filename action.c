@@ -73,6 +73,7 @@ unsigned char* encrypt_GTS_header(gts_args_t *gts_args, key_set* key_sets){
     memcpy(data_block, &gts_args->ver,1);
     memcpy(data_block+gts_args->ver_len, gts_args->token, 7);
     process_message(data_block, encrypted_header, key_sets, ENCRYPTION_MODE);
+    free(data_block);
     return encrypted_header;
 }
 
