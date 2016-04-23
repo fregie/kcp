@@ -1,9 +1,9 @@
 objects = action.o args.o des.o cJSON.o log.o
 
 GTS-server:GTS-client GTS-server.o $(objects)
-	cc -o GTS-server GTS-server.o $(objects) -lm -g
+	cc -o GTS-server GTS-server.o $(objects) -lm -lsodium -g
 GTS-client:GTS-client.o $(objects)
-	cc -o GTS-client GTS-client.o $(objects) -lm -g
+	cc -o GTS-client GTS-client.o $(objects) -lm -lsodium -g
 GTS-server.o:args.h action.h
 	cc -c GTS-server.c -g
 GTS-client.o:args.h action.h

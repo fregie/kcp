@@ -30,11 +30,10 @@ int main(int argc, char **argv){
     bzero(gts_args, sizeof(gts_args_t));
     gts_args->mode = GTS_MODE_CLIENT;
     int length;
-    int nonce_fd = open("/dev/urandom", O_RDONLY);
-    
     if (-1 == init_gts_args(gts_args)){
         printf("init client failed!");
     }
+    
     key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
     generate_sub_keys(gts_args->header_key, key_sets);
     unsigned char* encrypted_header = encrypt_GTS_header(gts_args, key_sets);
@@ -58,29 +57,29 @@ int main(int argc, char **argv){
         printf("waiting data.....data length:");
         readset = init_select(gts_args);    //select udp_socket and tun
         
-        bzero(gts_args->udp_buf, gts_args->mtu + gts_args->GTS_header_len);
+        bzero(gts_args->udp_buf, gts_args->mtu + GTS_HEADER_LEN );
         
         if (FD_ISSET(gts_args->UDP_sock, &readset)){
             length = recvfrom(gts_args->UDP_sock, gts_args->udp_buf,
-                            gts_args->mtu + gts_args->GTS_header_len, 0,
+                            gts_args->mtu + GTS_HEADER_LEN, 0,
                             (struct sockaddr*)&gts_args->remote_addr,
                             (socklen_t*)&gts_args->remote_addr_len);
                             
             // if (check_header(gts_args->token, gts_args->udp_buf, key_sets) != 0){
             //     continue;
             // }
-            write(gts_args->tun, gts_args->tun_buf, length - gts_args->GTS_header_len);
+            write(gts_args->tun, gts_args->tun_buf, length - GTS_HEADER_LEN);
             printf("%dbyte\n",length);
         }
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->tun_buf, gts_args->mtu);
             //add encrypt header
-            memcpy(gts_args->udp_buf, encrypted_header, gts_args->ver_len + gts_args->token_len);
+            memcpy(gts_args->udp_buf, encrypted_header, VER_LEN + TOKEN_LEN);
             //add random nonce
-            read(nonce_fd, gts_args->udp_buf + gts_args->ver_len + gts_args->token_len,gts_args->nonce_len);
+            randombytes_buf(gts_args->udp_buf + VER_LEN + TOKEN_LEN, NONCE_LEN);
             
             sendto(gts_args->UDP_sock, gts_args->udp_buf,
-                  length + gts_args->GTS_header_len, 0,
+                  length + GTS_HEADER_LEN, 0,
                   (struct sockaddr*)&gts_args->server_addr,
                   (socklen_t)sizeof(gts_args->server_addr));
             printf("%dbyte\n",length);
@@ -88,6 +87,5 @@ int main(int argc, char **argv){
     }
     
     close(gts_args->UDP_sock);
-    close(nonce_fd);
     return 0;
 }

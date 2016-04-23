@@ -16,7 +16,6 @@ int main() {
     gts_args->mode = GTS_MODE_SERVER;
     
     int length; //length of buffer recieved
-    int nonce_fd = open("/dev/urandom", O_RDONLY);
     init_gts_args(gts_args);
     
     signal(SIGINT, sig_handler);
@@ -35,23 +34,23 @@ int main() {
         printf("start listening.....\n");
         readset = init_select(gts_args);    //select udp_socket and tun
         
-        bzero(gts_args->udp_buf, gts_args->mtu + gts_args->GTS_header_len);
+        bzero(gts_args->udp_buf, gts_args->mtu + GTS_HEADER_LEN);
         //recv data from client
         if (FD_ISSET(gts_args->UDP_sock, &readset)){
             length = recvfrom(gts_args->UDP_sock, gts_args->udp_buf,
-                            gts_args->mtu + gts_args->GTS_header_len, 0,
+                            gts_args->mtu + GTS_HEADER_LEN, 0,
                             (struct sockaddr*)&gts_args->remote_addr,
                             (socklen_t*)&gts_args->remote_addr_len);
-            write(gts_args->tun, gts_args->tun_buf, length - gts_args->GTS_header_len);
+            write(gts_args->tun, gts_args->tun_buf, length - GTS_HEADER_LEN);
             printf("back:%dbyte\n",length);
         }
         // recv data from tun
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->tun_buf, gts_args->mtu);
-            read(nonce_fd, gts_args->udp_buf + gts_args->ver_len + gts_args->token_len, gts_args->nonce_len);
+            randombytes_buf(gts_args->udp_buf + VER_LEN + TOKEN_LEN, NONCE_LEN);
  
             sendto(gts_args->UDP_sock, gts_args->udp_buf,
-                  length + gts_args->GTS_header_len, 0,
+                  length + GTS_HEADER_LEN, 0,
                   (struct sockaddr*)&gts_args->remote_addr,
                   (socklen_t)gts_args->remote_addr_len);
             printf("to:%dbyte\n",length);

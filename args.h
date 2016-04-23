@@ -18,9 +18,14 @@
 #include <linux/if_tun.h>
 #include <netinet/in.h>
 #include <sys/select.h>
+#include <sodium.h>
 
-#define UDP_MTU 1500
 #define TUN_MTU 1432  // 1492 (Ethernet) - 20 (IPv4, or 40 for IPv6) - 8 (UDP) - 32 (GTS header)
+#define GTS_HEADER_LEN 32
+#define VER_LEN 1
+#define TOKEN_LEN 7
+#define NONCE_LEN 8
+#define AUTH_INFO_LEN 16
 
 typedef enum{
     GTS_MODE_SERVER = 1,
@@ -50,12 +55,12 @@ typedef struct{
   socklen_t remote_addr_len;
   
   unsigned char *header_key;
-  //GTS header
-  size_t GTS_header_len;
-  size_t ver_len;
-  size_t token_len;
-  size_t nonce_len;
-  size_t auth_info_len;
+  // //GTS header
+  // size_t GTS_header_len;
+  // size_t ver_len;
+  // size_t token_len;
+  // size_t nonce_len;
+  // size_t auth_info_len;
   uint8_t ver;
   char *token;
   char *nonce;

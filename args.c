@@ -56,18 +56,18 @@ int init_gts_args(gts_args_t *gts_args){
     }
     // gts_args->header_key = strdup("1234ABCD");
     
-    gts_args->GTS_header_len = 32;
-    gts_args->ver_len = 1;
-    gts_args->token_len = 7;
-    gts_args->nonce_len = 8; 
-    gts_args->auth_info_len = 16;
+    // gts_args->GTS_header_len = 32;
+    // gts_args->ver_len = 1;
+    // gts_args->token_len = 7;
+    // gts_args->nonce_len = 8; 
+    // gts_args->auth_info_len = 16;
     gts_args->ver = 1;
     // gts_args->token = "ABCDEFG";
     
     gts_args->mtu = TUN_MTU;
     
-    gts_args->udp_buf = malloc(gts_args->mtu + gts_args->GTS_header_len);
-    gts_args->tun_buf = gts_args->udp_buf + gts_args->GTS_header_len;
+    gts_args->udp_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
+    gts_args->tun_buf = gts_args->udp_buf + GTS_HEADER_LEN;
     
     gts_args->remote_addr_len = sizeof(gts_args->remote_addr);
     
