@@ -4,6 +4,7 @@
 #include "des.h"
 #include "cJSON.h"
 #include "log.h"
+#include "crypto.h"
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -20,6 +21,7 @@
 #include <sys/select.h>
 #include <sodium.h>
 
+#define MAX_USER 20
 #define TUN_MTU 1432  // 1492 (Ethernet) - 20 (IPv4, or 40 for IPv6) - 8 (UDP) - 32 (GTS header)
 #define GTS_HEADER_LEN 32
 #define VER_LEN 1
@@ -55,14 +57,8 @@ typedef struct{
   socklen_t remote_addr_len;
   
   unsigned char *header_key;
-  // //GTS header
-  // size_t GTS_header_len;
-  // size_t ver_len;
-  // size_t token_len;
-  // size_t nonce_len;
-  // size_t auth_info_len;
   uint8_t ver;
-  char *token;
+  char **token;
   char *nonce;
   char *auth_info;
 } gts_args_t;

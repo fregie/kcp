@@ -16,6 +16,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
     fclose(f);
     
     cJSON *json;
+    cJSON *token_json;
     json=cJSON_Parse(data);
 	if (!json){
         printf("Error before: [%s]\n",cJSON_GetErrorPtr());
@@ -23,9 +24,48 @@ int json_parse(gts_args_t *gts_args, char *filename){
     }
     gts_args->server = strdup(cJSON_GetObjectItem(json,"server")->valuestring);
     gts_args->port = cJSON_GetObjectItem(json,"port")->valueint;
-    gts_args->token = cJSON_GetObjectItem(json,"token")->valuestring;
-    gts_args->header_key = cJSON_GetObjectItem(json,"header key")->valuestring;
-    gts_args->password = cJSON_GetObjectItem(json,"password")->valuestring;
+    gts_args->header_key = strdup(cJSON_GetObjectItem(json,"header key")->valuestring);
+    gts_args->password = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
+    if (gts_args->mode == GTS_MODE_SERVER){
+        gts_args->token = malloc(MAX_USER*sizeof(char*));
+        token_json = cJSON_GetObjectItem(json,"token")->child;
+        int i =0;
+        while (token_json != 0){
+            char *value = token_json->valuestring;
+            int p = 0;
+            gts_args->token[i] = malloc(TOKEN_LEN);
+            while(*value && p < 7){
+                unsigned int temp;
+                int r = sscanf(value, "%2x", &temp);
+                if (r > 0){
+                    gts_args->token[i][p] = temp;
+                    value += 2;
+                    p++;
+                } else {
+                    break;
+                }
+            }
+            i++;
+            token_json = token_json->next;
+        }
+    }else if(gts_args->mode == GTS_MODE_CLIENT){
+        gts_args->token = malloc(sizeof(char*));
+        gts_args->token[0] = malloc(TOKEN_LEN);
+        char *value = cJSON_GetObjectItem(json,"token")->valuestring;
+        int p = 0;
+        while(*value && p < 7){
+                unsigned int temp;
+                int r = sscanf(value, "%2x", &temp);
+                if (r > 0){
+                    gts_args->token[0][p] = temp;
+                    value += 2;
+                    p++;
+                } else {
+                    break;
+                }
+        }
+        
+    }
     
     return 0;
 }
@@ -67,7 +107,7 @@ int init_gts_args(gts_args_t *gts_args){
     gts_args->mtu = TUN_MTU;
     
     gts_args->udp_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
-    gts_args->tun_buf = gts_args->udp_buf + GTS_HEADER_LEN;
+    gts_args->tun_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
     
     gts_args->remote_addr_len = sizeof(gts_args->remote_addr);
     

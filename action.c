@@ -66,17 +66,12 @@ fd_set init_select(gts_args_t *gts_args){
     return readset; 
 }
 
-
-unsigned char* encrypt_GTS_header(gts_args_t *gts_args, key_set* key_sets){
+unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, key_set* key_sets){
     unsigned char* data_block = (unsigned char*) malloc(8*sizeof(char));
     unsigned char* encrypted_header = (unsigned char*) malloc(8*sizeof(char));
-    memcpy(data_block, &gts_args->ver,VER_LEN);
-    memcpy(data_block + VER_LEN, gts_args->token, TOKEN_LEN);
+    memcpy(data_block, ver,VER_LEN);
+    memcpy(data_block + VER_LEN, token, TOKEN_LEN);
     process_message(data_block, encrypted_header, key_sets, ENCRYPTION_MODE);
     free(data_block);
     return encrypted_header;
-}
-
-void decrypt_GTS_header(gts_args_t *gts_args){
-    
 }
