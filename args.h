@@ -40,7 +40,7 @@ typedef struct{
   gts_mode mode;
   uint16_t port;
   char *server;
-  char *password;
+  char **password;
   char *shell_up;
   char *shell_down;
   char *intf;
@@ -59,10 +59,13 @@ typedef struct{
   unsigned char *header_key;
   uint8_t ver;
   char **token;
+  size_t token_len;
   char *nonce;
   char *auth_info;
+  
+  uint32_t netip;
 } gts_args_t;
 
-int init_gts_args(gts_args_t *gts_args);
+int init_gts_args(gts_args_t *gts_args, char *conf_file);
 
 #endif

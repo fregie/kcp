@@ -17,6 +17,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
     
     cJSON *json;
     cJSON *token_json;
+    cJSON *password;
     json=cJSON_Parse(data);
 	if (!json){
         printf("Error before: [%s]\n",cJSON_GetErrorPtr());
@@ -25,12 +26,23 @@ int json_parse(gts_args_t *gts_args, char *filename){
     gts_args->server = strdup(cJSON_GetObjectItem(json,"server")->valuestring);
     gts_args->port = cJSON_GetObjectItem(json,"port")->valueint;
     gts_args->header_key = strdup(cJSON_GetObjectItem(json,"header key")->valuestring);
-    gts_args->password = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
     if (gts_args->mode == GTS_MODE_SERVER){
+        //init password
+        gts_args->password = malloc(MAX_USER*sizeof(char*));
+        password = cJSON_GetObjectItem(json,"password")->child;
+        int k = 0;
+        while (password != 0){
+            gts_args->password[k] = strdup(password->valuestring);
+            password = password->next;
+            k++;
+        } 
+        //init tokens
         gts_args->token = malloc(MAX_USER*sizeof(char*));
         token_json = cJSON_GetObjectItem(json,"token")->child;
         int i =0;
+        gts_args->token_len = 0;
         while (token_json != 0){
+            gts_args->token_len++;
             char *value = token_json->valuestring;
             int p = 0;
             gts_args->token[i] = malloc(TOKEN_LEN);
@@ -49,6 +61,8 @@ int json_parse(gts_args_t *gts_args, char *filename){
             token_json = token_json->next;
         }
     }else if(gts_args->mode == GTS_MODE_CLIENT){
+        gts_args->password = malloc(sizeof(char*));
+        gts_args->password[0] = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
         gts_args->token = malloc(sizeof(char*));
         gts_args->token[0] = malloc(TOKEN_LEN);
         char *value = cJSON_GetObjectItem(json,"token")->valuestring;
@@ -70,8 +84,8 @@ int json_parse(gts_args_t *gts_args, char *filename){
     return 0;
 }
 
-int init_gts_args(gts_args_t *gts_args){
-    if (0 != json_parse(gts_args, "/home/fregie/GTS/samples/client.json")){
+int init_gts_args(gts_args_t *gts_args,char *conf_file){
+    if (0 != json_parse(gts_args, conf_file)){
         printf("json parse failed");
         return -1;
     }
@@ -82,14 +96,17 @@ int init_gts_args(gts_args_t *gts_args){
         gts_args->shell_up = strdup("./samples/server_up.sh");
         gts_args->shell_down = strdup("./samples/server_down.sh");
         gts_args->intf = strdup("GTSs_tun");
-        
+        in_addr_t addr = inet_addr("10.7.0.1");
+        gts_args->netip = ntohl((uint32_t)addr);
     }else if (gts_args->mode == GTS_MODE_CLIENT){
         gts_args->shell_up = strdup("./samples/client_up.sh");
-        gts_args->shell_down = 
+        gts_args->shell_down = strdup("./samples/client_down.sh");
         gts_args->intf = strdup("GTSc_tun");
         gts_args->server_addr.sin_family = AF_INET;
         gts_args->server_addr.sin_port = htons(gts_args->port);
         gts_args->server_addr.sin_addr.s_addr = inet_addr(gts_args->server);
+        in_addr_t addr = inet_addr("10.7.0.2");
+        gts_args->netip = ntohl((uint32_t)addr);
     }else {
         printf("unknow mode");
         return -1;

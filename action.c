@@ -1,5 +1,15 @@
 #include "action.h"
 
+static const char *help_message =
+"usage: GTS-server config_file\n"
+"       GTS-client config_file\n"
+"example:GTS-server /etc/GTS/server.json\n"
+"        GTS-client /etc/GTS/client.json\n"
+"GTS-----geewan transmit system\n";
+
+void print_help(){
+  printf("%s",help_message);
+}
 
 int tun_create(const char *dev){
   struct ifreq ifr;

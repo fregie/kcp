@@ -1,7 +1,7 @@
-objects = action.o args.o des.o cJSON.o log.o crypto.o crypto_secretbox_salsa208poly1305.o
+objects = action.o args.o des.o cJSON.o log.o crypto.o crypto_secretbox_salsa208poly1305.o hash.o
 
-GTS-server:GTS-client GTS-server.o $(objects)
-	cc -o GTS-server GTS-server.o $(objects) -lm -lsodium -g
+GTS-server:GTS-client GTS-server.o nat.o $(objects)
+	cc -o GTS-server GTS-server.o nat.o $(objects) -lm -lsodium -g
 GTS-client:GTS-client.o $(objects)
 	cc -o GTS-client GTS-client.o $(objects) -lm -lsodium -g
 GTS-server.o:args.h action.h
@@ -22,6 +22,9 @@ crypto.o:crypto.h
 	cc -c crypto.c -g
 crypto_secretbox_salsa208poly1305.o:crypto_secretbox_salsa208poly1305.h
 	cc -c crypto_secretbox_salsa208poly1305.c -g
-	
+hash.o:args.h hash.h
+	cc -c hash.c -g
+nat.o:nat.h hash.h
+	cc -c nat.c -g
 clean:
-	rm GTS-client GTS-server GTS-client.o GTS-server.o $(objects)
+	rm GTS-client GTS-server GTS-client.o GTS-server.o nat.o $(objects)

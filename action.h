@@ -4,6 +4,7 @@
 #include "args.h"
 #include "des.h"
 
+void print_help();
 int tun_create(const char *dev);
 int init_UDP_socket(char* server_address, uint16_t server_port);
 int max(int a, int b);

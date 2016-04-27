@@ -2,6 +2,6 @@
     "server":"192.168.77.1",
     "port":6666,
     "header key":"1234ABCD",
-    "password":"789632145",
+    "password":["789632145","541236987","123456789"],
     "token":["7e335d67f1dc2c","ff593b9e6abeb2","e3c7b8db40a961"]
 }

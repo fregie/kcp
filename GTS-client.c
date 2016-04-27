@@ -10,7 +10,7 @@ static void sig_handler(int signo) {
 
 int check_header(char *token, unsigned char *buf, key_set* key_sets){
     unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
-    process_message(data_block, buf, key_sets, DECRYPTION_MODE);
+    process_message(buf, data_block, key_sets, DECRYPTION_MODE);
     data_block[8] = 0;
     if (data_block[0] != 1){
         printf("version check failed");
@@ -27,13 +27,17 @@ int check_header(char *token, unsigned char *buf, key_set* key_sets){
 }
 
 int main(int argc, char **argv){
+    if (argc != 2){
+        print_help();
+        return EXIT_FAILURE;
+    }
     //init gts_args
     gts_args_t GTS_args;
     gts_args_t *gts_args = &GTS_args;
     bzero(gts_args, sizeof(gts_args_t));
     gts_args->mode = GTS_MODE_CLIENT;
     int length;
-    if (-1 == init_gts_args(gts_args)){
+    if (-1 == init_gts_args(gts_args, argv[1])){
         printf("init client failed!");
         return EXIT_FAILURE;
     }
@@ -43,11 +47,11 @@ int main(int argc, char **argv){
     unsigned char* encrypted_header = encrypt_GTS_header(&gts_args->ver, gts_args->token[0], key_sets);
     //init crypto
     if (0 != crypto_init()) {
-        errf("shadowvpn_crypto_init");
+        printf("GTS_crypto_init failed");
         return EXIT_FAILURE;
     }
-    if (0 !=crypto_set_password(gts_args->password, strlen(gts_args->password))) {
-        errf("can not set password");
+    if (0 !=crypto_set_password(gts_args->password[0], strlen(gts_args->password[0]))) {
+        printf("can not set password");
         return EXIT_FAILURE;
     }
     
@@ -84,7 +88,7 @@ int main(int argc, char **argv){
             }
             if (-1 == crypto_decrypt(gts_args->tun_buf, gts_args->udp_buf,
                                     length - GTS_HEADER_LEN)){
-                errf("dropping invalid packet, maybe wrong password");
+                printf("dropping invalid packet, maybe wrong password");
             }
             write(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
             printf("%dbyte\n",length);
