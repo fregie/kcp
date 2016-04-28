@@ -12,6 +12,7 @@ unsigned char* decrypt_header(unsigned char *buf, key_set* key_sets){
 
 static void sig_handler(int signo) {
     system("sh ./samples/server_down.sh");
+    unlink(IPC_FILE);
     exit(0);
 }
 
@@ -41,6 +42,8 @@ int main(int argc, char **argv) {
     //init UDP_sock and GTSs_tun
     gts_args->UDP_sock = init_UDP_socket(gts_args->server,gts_args->port);
     gts_args->tun = tun_create(gts_args->intf);
+    gts_args->IPC_sock = init_IPC_socket();
+
     if (gts_args->tun < 0){
         printf("tun create failed!");
         return EXIT_FAILURE;
@@ -114,6 +117,13 @@ int main(int argc, char **argv) {
                   (struct sockaddr*)&client->source_addr.addr,
                   (socklen_t)client->source_addr.addrlen);
             printf("to:%dbyte\n",length);
+        }
+        if (FD_ISSET(gts_args->IPC_sock, &readset)){
+                char rx_buf[500];
+                struct sockaddr_un pmapi_addr;
+                int len = sizeof(pmapi_addr);
+                int recvSize = recvfrom(gts_args->IPC_sock, rx_buf, sizeof(rx_buf), 0, (struct sockaddr*)&pmapi_addr, &len);
+                printf("Recved message from pmapi: %s\n", rx_buf);
         }
     }
     close(gts_args->UDP_sock);

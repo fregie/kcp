@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +22,7 @@
 #include <sys/select.h>
 #include <sodium.h>
 
+#define IPC_FILE "/tmp/GTS.sock"
 #define MAX_USER 20
 #define TUN_MTU 1432  // 1492 (Ethernet) - 20 (IPv4, or 40 for IPv6) - 8 (UDP) - 32 (GTS header)
 #define GTS_HEADER_LEN 32
@@ -48,6 +50,7 @@ typedef struct{
   // declare fds
   int tun;
   int UDP_sock;
+  int IPC_sock;
   //declare buffers
   unsigned char *tun_buf;
   unsigned char *udp_buf;
