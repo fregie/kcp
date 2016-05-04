@@ -23,62 +23,100 @@ int json_parse(gts_args_t *gts_args, char *filename){
         printf("Error before: [%s]\n",cJSON_GetErrorPtr());
         return -1;
     }
-    gts_args->server = strdup(cJSON_GetObjectItem(json,"server")->valuestring);
-    gts_args->port = cJSON_GetObjectItem(json,"port")->valueint;
-    gts_args->header_key = strdup(cJSON_GetObjectItem(json,"header key")->valuestring);
-    if (gts_args->mode == GTS_MODE_SERVER){
-        //init password
-        gts_args->password = malloc(MAX_USER*sizeof(char*));
-        password = cJSON_GetObjectItem(json,"password")->child;
-        int k = 0;
-        while (password != 0){
-            gts_args->password[k] = strdup(password->valuestring);
-            password = password->next;
-            k++;
-        } 
-        //init tokens
-        gts_args->token = malloc(MAX_USER*sizeof(char*));
-        token_json = cJSON_GetObjectItem(json,"token")->child;
-        int i =0;
-        gts_args->token_len = 0;
-        while (token_json != 0){
-            gts_args->token_len++;
-            char *value = token_json->valuestring;
-            int p = 0;
-            gts_args->token[i] = malloc(TOKEN_LEN);
-            while(*value && p < 7){
-                unsigned int temp;
-                int r = sscanf(value, "%2x", &temp);
-                if (r > 0){
-                    gts_args->token[i][p] = temp;
-                    value += 2;
-                    p++;
-                } else {
-                    break;
-                }
+    if (cJSON_HasObjectItem(json,"server") == 1){
+        gts_args->server = strdup(cJSON_GetObjectItem(json,"server")->valuestring);
+    }else{
+        printf("can't find server ip in config file\n");
+        return -1;
+    }
+    if (cJSON_HasObjectItem(json,"port") == 1){
+        gts_args->port = cJSON_GetObjectItem(json,"port")->valueint;
+    }else{
+        printf("can't find port\n");
+        return -1;
+    }
+    if (cJSON_HasObjectItem(json,"header key") == 1){
+        gts_args->header_key = strdup(cJSON_GetObjectItem(json,"header key")->valuestring);
+    }else{
+        printf("can't find header key\n");
+        return -1;
+    }
+    if (cJSON_HasObjectItem(json,"logfile") == 1){
+        gts_args->log_file = strdup(cJSON_GetObjectItem(json,"logfile")->valuestring);
+    }else{
+        gts_args->log_file = strdup("/var/log/GTS-client.log");
+    }
+    gts_args->pid_file = strdup(cJSON_GetObjectItem(json,"pidfile")->valuestring);
+    if (cJSON_HasObjectItem(json,"password") == 1 && cJSON_HasObjectItem(json,"token") == 1){
+        if (gts_args->mode == GTS_MODE_SERVER){
+            if (cJSON_GetArraySize(cJSON_GetObjectItem(json,"password")) != cJSON_GetArraySize(cJSON_GetObjectItem(json,"token"))){
+                printf("token numbers != password numbers\n");
+                return -1;
             }
-            i++;
-            token_json = token_json->next;
-        }
-    }else if(gts_args->mode == GTS_MODE_CLIENT){
-        gts_args->password = malloc(sizeof(char*));
-        gts_args->password[0] = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
-        gts_args->token = malloc(sizeof(char*));
-        gts_args->token[0] = malloc(TOKEN_LEN);
-        char *value = cJSON_GetObjectItem(json,"token")->valuestring;
-        int p = 0;
-        while(*value && p < 7){
-                unsigned int temp;
-                int r = sscanf(value, "%2x", &temp);
-                if (r > 0){
-                    gts_args->token[0][p] = temp;
-                    value += 2;
-                    p++;
-                } else {
-                    break;
+            //init password
+            gts_args->password = malloc(MAX_USER*sizeof(char*));
+            password = cJSON_GetObjectItem(json,"password")->child;
+            int k = 0;
+            while (password != 0){
+                gts_args->password[k] = strdup(password->valuestring);
+                password = password->next;
+                k++;
+            } 
+            //init tokens
+            gts_args->token = malloc(MAX_USER*sizeof(char*));
+            token_json = cJSON_GetObjectItem(json,"token")->child;
+            int i =0;
+            gts_args->token_len = 0;
+            while (token_json != 0){
+                gts_args->token_len++;
+                char *value = token_json->valuestring;
+                int p = 0;
+                gts_args->token[i] = malloc(TOKEN_LEN);
+                while(*value && p < 7){
+                    unsigned int temp;
+                    int r = sscanf(value, "%2x", &temp);
+                    if (r > 0){
+                        gts_args->token[i][p] = temp;
+                        value += 2;
+                        p++;
+                    } else {
+                        break;
+                    }
                 }
+                i++;
+                token_json = token_json->next;
+            }
+        }else if(gts_args->mode == GTS_MODE_CLIENT){
+            gts_args->password = malloc(sizeof(char*));
+            if (cJSON_HasObjectItem(json,"password") == 1){
+                gts_args->password[0] = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
+            }else{
+                printf("can't find password\n");
+                return -1;
+            }
+            gts_args->token = malloc(sizeof(char*));
+            gts_args->token[0] = malloc(TOKEN_LEN);
+            char *value;
+            if (cJSON_HasObjectItem(json,"token") == 1){
+                value = cJSON_GetObjectItem(json,"token")->valuestring;
+            }else{
+                printf("can't find token\n");
+                return -1;
+            }
+            int p = 0;
+            while(*value && p < 7){
+                    unsigned int temp;
+                    int r = sscanf(value, "%2x", &temp);
+                    if (r > 0){
+                        gts_args->token[0][p] = temp;
+                        value += 2;
+                        p++;
+                    } else {
+                        break;
+                    }
+            }
+            
         }
-        
     }
     
     return 0;

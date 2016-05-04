@@ -3,6 +3,9 @@
 #include "hash.h"
 #include <signal.h>
 
+#define ACT_OK "{\"status\":\"ok\"}"
+#define ACT_FAILED "{\"status\":\"failed\"}"
+
 unsigned char* decrypt_header(unsigned char *buf, key_set* key_sets){
     unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
     process_message(buf, data_block, key_sets, DECRYPTION_MODE);
@@ -30,8 +33,15 @@ int main(int argc, char **argv) {
     hash_ctx_t *hash_ctx;
     hash_ctx = malloc(sizeof(hash_ctx_t));
     int length; //length of buffer recieved
-    
+    printf("GTS-server start....\n");
     init_gts_args(gts_args, argv[1]);
+    if(init_log_file(gts_args->log_file) == -1){
+        errf("init log_file failed!");
+    }
+/*    pid_t pid = getpid();
+    if (0 != write_pid_file(gts_args->pid_file, pid)) {
+        return EXIT_FAILURE;
+    }*/
     init_hash(hash_ctx, gts_args);
     
     //init header_key
@@ -45,14 +55,13 @@ int main(int argc, char **argv) {
     gts_args->IPC_sock = init_IPC_socket();
 
     if (gts_args->tun < 0){
-        printf("tun create failed!");
+        errf("tun create failed!");
         return EXIT_FAILURE;
     }else{
         system(gts_args->shell_up);
     }
     fd_set readset;
     while (gts_args->ver == 1){
-        printf("start listening.....\n");
         readset = init_select(gts_args);    //select udp_socket and tun
         
         bzero(gts_args->udp_buf, gts_args->mtu + GTS_HEADER_LEN);
@@ -67,36 +76,36 @@ int main(int argc, char **argv) {
             //check version
             unsigned char* header = decrypt_header(gts_args->udp_buf, key_sets);
             if (header[0] != 1){
-                printf("version check failed,drop!");
+                errf("version check failed,drop!");
                 free(header);
                 continue;
             }
             client_info_t *client = NULL;
             HASH_FIND(hh1, hash_ctx->token_to_clients, header+VER_LEN, TOKEN_LEN, client);
             if(client == NULL){
-                printf("unknow token, drop!");
+                errf("unknow token, drop!");
                 free(header);
                 continue;
             }
             free(header);
             //save source address
+            client->tx += (length - GTS_HEADER_LEN);
             client->source_addr.addrlen = temp_remote_addrlen;
             memcpy(&client->source_addr.addr, &temp_remote_addr, temp_remote_addrlen);
             
             if (0 !=crypto_set_password(client->password, strlen(client->password))) {
-                printf("can not find password");
+                errf("can not find password");
                 continue;
             }
             if (-1 == crypto_decrypt(gts_args->tun_buf, gts_args->udp_buf,
                                     length - GTS_HEADER_LEN)){
-                printf("dropping invalid packet, maybe wrong password");
+                errf("dropping invalid packet, maybe wrong password");
             }
             if (-1 == nat_fix_upstream(client, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN)){
                 continue;
             }
             
             write(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
-            printf("back:%dbyte\n",length-32);
         }
         // recv data from tun
         if (FD_ISSET(gts_args->tun, &readset)){
@@ -107,25 +116,34 @@ int main(int argc, char **argv) {
                 continue;
             }
             if (0 !=crypto_set_password(client->password, strlen(client->password))) {
-                printf("can not find password");
+                errf("can not find password");
                 continue;
             }
             crypto_encrypt(gts_args->udp_buf, gts_args->tun_buf, length);
             memcpy(gts_args->udp_buf, client->encrypted_header, VER_LEN+TOKEN_LEN);
+            client->rx += length;
             sendto(gts_args->UDP_sock, gts_args->udp_buf,
                   length + GTS_HEADER_LEN, 0,
                   (struct sockaddr*)&client->source_addr.addr,
                   (socklen_t)client->source_addr.addrlen);
-            printf("to:%dbyte\n",length);
         }
         if (FD_ISSET(gts_args->IPC_sock, &readset)){
                 char rx_buf[500];
                 struct sockaddr_un pmapi_addr;
                 int len = sizeof(pmapi_addr);
                 int recvSize = recvfrom(gts_args->IPC_sock, rx_buf, sizeof(rx_buf), 0, (struct sockaddr*)&pmapi_addr, &len);
-                printf("%s",rx_buf);
-                if (api_request_parse(hash_ctx, rx_buf, gts_args) != 0){
-                    printf("action failed!");
+                int r = api_request_parse(hash_ctx, rx_buf, gts_args);
+                if (r == -1){
+                    errf("action failed!");
+                    sendto(gts_args->IPC_sock, ACT_FAILED, strlen(ACT_FAILED),0, (struct sockaddr*)&pmapi_addr, len);
+                    continue;
+                }else if(r == 0){
+                    sendto(gts_args->IPC_sock, ACT_OK, strlen(ACT_OK),0, (struct sockaddr*)&pmapi_addr, len);
+                    continue;
+                }else if(r == 1){
+                    char *send_buf = generate_stat_info(hash_ctx);
+                    sendto(gts_args->IPC_sock, send_buf, strlen(send_buf),0, (struct sockaddr*)&pmapi_addr, len);
+                    free(send_buf);
                     continue;
                 }
         }

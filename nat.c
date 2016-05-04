@@ -34,7 +34,7 @@
 int nat_fix_upstream(client_info_t *client, unsigned char *buf, size_t buflen){
     uint8_t iphdr_len;
     if (buflen < 20){
-        printf("nat: ip packet too short");
+        errf("nat: ip packet too short");
         return -1;
     }
     ipv4_hdr_t *iphdr = (ipv4_hdr_t *)buf;
@@ -76,7 +76,7 @@ int nat_fix_upstream(client_info_t *client, unsigned char *buf, size_t buflen){
 client_info_t* nat_fix_downstream(hash_ctx_t *hash_ctx, unsigned char *buf, size_t buflen){
     uint8_t iphdr_len;
     if (buflen < 20){
-        printf("nat:ip packet too short");
+        errf("nat:ip packet too short");
         return NULL;
     }
     ipv4_hdr_t *iphdr = (ipv4_hdr_t *)buf;
@@ -90,7 +90,7 @@ client_info_t* nat_fix_downstream(hash_ctx_t *hash_ctx, unsigned char *buf, size
     client_info_t *client = NULL;
     HASH_FIND(hh2, hash_ctx->ip_to_clients, &iphdr->daddr, 4, client);
     if (client == NULL) {
-        printf("nat: client not found for given user ip");
+        errf("nat: client not found for given user ip");
         return NULL;
     }
     int32_t acc = 0;
@@ -110,7 +110,7 @@ client_info_t* nat_fix_downstream(hash_ctx_t *hash_ctx, unsigned char *buf, size
             ADJUST_CHECKSUM(acc, tcphdr->checksum);
         }else if(iphdr->proto == IPPROTO_UDP){
             if (buflen < iphdr_len + 8){
-                printf("nat: udp packet too short");
+                errf("nat: udp packet too short");
                 return NULL;
             }
             udp_hdr_t *udphdr = ip_payload;

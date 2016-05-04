@@ -1,7 +1,7 @@
 #include "action.h"
 
-//define unix domain socket path
 
+#define PID_BUF_SIZE 32
 
 static const char *help_message =
 "usage: GTS-server config_file\n"
@@ -19,7 +19,7 @@ int tun_create(const char *dev){
   int fd, e;
 
   if ((fd = open("/dev/net/tun", O_RDWR)) < 0) {
-    printf("can not open /dev/net/tun");
+    errf("can not open /dev/net/tun");
     return -1;
   }
 
@@ -35,8 +35,8 @@ int tun_create(const char *dev){
     strncpy(ifr.ifr_name, dev, IFNAMSIZ);
   
   if ((e = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0){
-    printf("ioctl[TUNSETIFF]");
-    printf("can not setup tun device: %s", dev);
+    errf("ioctl[TUNSETIFF]");
+    errf("can not setup tun device: %s", dev);
     close(fd);
     return -1;
   }
@@ -71,7 +71,7 @@ int init_IPC_socket(){
     //create pmmanager socket fd
     pmmanager_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if(pmmanager_fd == -1){
-    perror("cannot create pmmanager fd.");
+    errf("cannot create pmmanager fd.");
     }
 
     unlink(IPC_FILE);
@@ -82,27 +82,24 @@ int init_IPC_socket(){
     //bind pmmanager_fd to pmmanager_addr
     ret = bind(pmmanager_fd, (struct sockaddr*)&pmmanager_addr, sizeof(pmmanager_addr));
     if(ret == -1){
-    perror("can not bind pmmanager_addr");
+    errf("can not bind pmmanager_addr");
     }
     
     int recvBufSize;
     len = sizeof(recvBufSize);
     ret = getsockopt(pmmanager_fd, SOL_SOCKET, SO_RCVBUF, &recvBufSize, &len);
     if(ret ==-1){
-        perror("getsocket error.");
+        errf("getsocket error.");
     }
-    // printf("Before setsockopt, SO_RCVBUF-%d\n",recvBufSize); 
     recvBufSize = 512*1024;
     ret = setsockopt(pmmanager_fd, SOL_SOCKET, SO_RCVBUF, &recvBufSize, len);
     if(ret == -1){
-        perror("setsockopt error.");
+        errf("setsockopt error.");
     }
     ret = getsockopt(pmmanager_fd, SOL_SOCKET, SO_RCVBUF, &recvBufSize, &len);
     if(ret ==-1){
-        perror("getsocket error.");
+        errf("getsocket error.");
     }
-    // printf("Set recv buf successful, SO_RCVBUF-%d\n",recvBufSize); 
-    // printf("==============wait for msg from pmapi====================\n");
     return pmmanager_fd;
 }
 
@@ -143,19 +140,33 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
     cJSON *json;
     json = cJSON_Parse(data);
     if(!json){
-        printf("request parse failed");
+        errf("request parse failed");
         return -1;
     }
     act = strdup(cJSON_GetObjectItem(json,"act")->valuestring);
     if (strcmp(act,"add_user") == 0){
         client_info_t *client = malloc(sizeof(client_info_t));
         bzero(client, sizeof(client_info_t));
-        memcpy(client->token, strdup(cJSON_GetObjectItem(json,"token")->valuestring), TOKEN_LEN);
+        char *token = strdup(cJSON_GetObjectItem(json,"token")->valuestring);
+        int p = 0;
+        while (p < 7){
+            unsigned int temp;
+            int r = sscanf(token, "%2x", &temp);
+            if(r > 0){
+                client->token[p] = temp;
+                token += 2;
+                p++;
+            }else{
+                break;
+            }
+        }
         client->password = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
         key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
         generate_sub_keys(gts_args->header_key, key_sets);
         client->encrypted_header = encrypt_GTS_header(&gts_args->ver, client->token, key_sets);
         free(key_sets);
+        client->rx = 0;
+        client->tx = 0;
         int i;
         for (i = 0;i <255;i++){
             uint32_t temp_ip = htonl(gts_args->netip + i +1);
@@ -167,7 +178,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             }
         }
         if(client == NULL){
-            printf("add user failed!,may be too many user");
+            errf("add user failed!,may be too many user");
             return -1;
         }
         HASH_ADD(hh1, ctx->token_to_clients, token, TOKEN_LEN, client);
@@ -175,15 +186,120 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         return 0;
     }else if(strcmp(act,"del_user") == 0){
         char *token = strdup(cJSON_GetObjectItem(json,"token")->valuestring);
+        char real_token[TOKEN_LEN];
+        int p = 0;
+        while (p < 7){
+            unsigned int temp;
+            int r = sscanf(token, "%2x", &temp);
+            if(r > 0){
+                real_token[p] = temp;
+                token += 2;
+                p++;
+            }else{
+                break;
+            }
+        }
         client_info_t *client = malloc(sizeof(client_info_t));
-        HASH_FIND(hh1, ctx->token_to_clients, token, TOKEN_LEN, client);
+        HASH_FIND(hh1, ctx->token_to_clients, real_token, TOKEN_LEN, client);
+        if(client == NULL){
+            errf("can't find token from hash table");
+            return -1;
+        }
         HASH_DELETE(hh1,ctx->token_to_clients, client);
         HASH_DELETE(hh2,ctx->ip_to_clients, client);
     }else if(strcmp(act,"show_stat") == 0){
-        return 0;
+        return 1;
     }else{
-        printf("unknow cmd act");
+        errf("unknow act cmd");
         return -1;
     }
     free(json);
+}
+
+char* generate_stat_info(hash_ctx_t *ctx){
+    char *output;
+    cJSON *root,*info;
+    root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "status", "ok");
+    cJSON_AddItemToObject(root, "stat", info = cJSON_CreateArray());
+    client_info_t *client;
+    for(client = ctx->token_to_clients; client != NULL; client=client->hh1.next){
+        cJSON *user;
+        cJSON_AddItemToArray(info, user = cJSON_CreateObject());
+        char *token = client->token;
+        char *print_token = malloc(100);
+        sprintf(print_token, "%2x%2x%2x%2x%2x%2x%2x",(uint8_t)client->token[0],
+                (uint8_t)client->token[1], (uint8_t)client->token[2],(uint8_t)client->token[3],
+                (uint8_t)client->token[4], (uint8_t)client->token[5],(uint8_t)client->token[6]);
+        cJSON_AddStringToObject(user, "token", print_token);
+        cJSON_AddNumberToObject(user, "tx", client->tx);
+        cJSON_AddNumberToObject(user, "rx", client->rx);
+    }
+    output = cJSON_Print(root);
+    return output;
+}
+
+int init_log_file(char *filename){
+    // then rediret stdout & stderr
+    fclose(stdin);
+    FILE *fp;
+    fp = freopen(filename, "a", stdout);
+    if (fp == NULL) {
+        err("freopen");
+        return -1;
+    }
+    fp = freopen(filename, "a", stderr);
+    if (fp == NULL) {
+        err("freopen");
+        return -1;
+    }
+
+    return 0;
+}
+
+int write_pid_file(char *filename, pid_t pid) {
+    char buf[PID_BUF_SIZE];
+    int fd = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (fd == -1) {
+        errf("can not open %s", filename);
+        err("open");
+        return -1;
+    }
+    int flags = fcntl(fd, F_GETFD);
+    if (flags == -1) {
+        err("fcntl");
+        return -1;
+    }
+
+    flags |= FD_CLOEXEC;
+    if (-1 == fcntl(fd, F_SETFD, flags))
+        err("fcntl");
+
+    struct flock fl;
+    fl.l_type = F_WRLCK;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    if (-1 == fcntl(fd, F_SETLK, &fl)) {
+        ssize_t n = read(fd, buf, PID_BUF_SIZE - 1);
+        if (n > 0) {
+        buf[n] = 0;
+        errf("already started at pid %ld", atol(buf));
+        } else {
+        errf("already started");
+        }
+        close(fd);
+        return -1;
+    }
+    if (-1 == ftruncate(fd, 0)) {
+        err("ftruncate");
+        return -1;
+    }
+    snprintf(buf, PID_BUF_SIZE, "%ld\n", (long)getpid());
+
+    if (write(fd, buf, strlen(buf)) != strlen(buf)) {
+        err("write");
+        return -1;
+    }
+    return 0;
 }

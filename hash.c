@@ -18,10 +18,12 @@ int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args){
         //     tun IP is 10.7.0.1
         //     client IPs will be 10.7.0.2, 10.7.0.3, 10.7.0.4, etc
         client->output_tun_ip = htonl(gts_args->netip + i + 1);
+        client->rx = 0;
+        client->tx = 0;
 
         struct in_addr in;
         in.s_addr = client->output_tun_ip;
-
+        
         // add to hash: ctx->token_to_clients[token] = client
         HASH_ADD(hh1, ctx->token_to_clients, token, TOKEN_LEN, client);
 

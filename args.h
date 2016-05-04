@@ -67,6 +67,9 @@ typedef struct{
   char *auth_info;
   
   uint32_t netip;
+  
+  char *log_file;
+  char *pid_file;
 } gts_args_t;
 
 int init_gts_args(gts_args_t *gts_args, char *conf_file);

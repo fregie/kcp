@@ -3,5 +3,7 @@
     "port":6666,
     "header key":"1234ABCD",
     "password":"789632145",
-    "token":"7e335d67f1dc2c"
+    "token":"7e335d67f1dc2c",
+    "logfile":"/var/log/GTS-client.log",
+    "pidfile":"/var/run/GTS-server.pid"
 }
