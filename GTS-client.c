@@ -26,8 +26,32 @@ int check_header(char *token, unsigned char *buf, key_set* key_sets){
     }
 }
 
+char* header_key_parse(char *password, char *header_key){
+    unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
+    key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
+    generate_sub_keys(password, key_sets);
+    process_message(header_key, data_block, key_sets, DECRYPTION_MODE);
+    data_block[8] = 0;
+    return data_block;
+}
+
 int main(int argc, char **argv){
-    if (argc != 2){
+    int ch;
+    char *conf_file = NULL;
+    char *header_key = NULL;
+    while ((ch = getopt(argc, argv, "hc:")) != -1){
+        switch (ch){
+        case 'c':
+            conf_file = strdup(optarg);
+            break;
+        case 'k':
+            header_key = strdup(optarg);
+        default:
+            print_help();
+            break;
+        }
+    }
+    if (argc == 1 || conf_file == NULL){
         print_help();
         return EXIT_FAILURE;
     }
@@ -38,13 +62,18 @@ int main(int argc, char **argv){
     gts_args->mode = GTS_MODE_CLIENT;
     int length;
     printf("GTS-client start.....\n");
-    if (-1 == init_gts_args(gts_args, argv[1])){
+    if (-1 == init_gts_args(gts_args, conf_file)){
         printf("init client failed!");
         return EXIT_FAILURE;
     }
     if(init_log_file(gts_args->log_file) == -1){
         errf("init log_file failed!");
     }
+    if (header_key != NULL){
+        gts_args->header_key = header_key_parse(gts_args->password, header_key);
+    }
+    free(header_key);
+    set_env(gts_args);
 /*    pid_t pid = getpid();
     if (0 != write_pid_file(gts_args->pid_file, pid)) {
         return EXIT_FAILURE;

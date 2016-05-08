@@ -2,8 +2,11 @@
     "server":"192.168.77.1",
     "port":6666,
     "header key":"1234ABCD",
-    "password":["541236987","123456789"],
-    "token":["ff593b9e6abeb2","e3c7b8db40a961"],
+    "password":["1234abcd","541236987","123456789"],
+    "token":["7e335d67f1dc2c","ff593b9e6abeb2","e3c7b8db40a961"],
+    "intf":"GTSs_tun",
+    "mtu":1432,
+    "net":"10.7.0.1/24",
     "logfile":"/var/log/GTS-server.log",
     "pidfile":"/var/run/GTS-server.pid"
 }

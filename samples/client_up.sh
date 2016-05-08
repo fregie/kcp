@@ -1,8 +1,22 @@
 #!/bin/sh
+sysctl -w net.ipv4.ip_forward=1
 
-ip addr add 10.7.0.2/24 dev GTSc_tun
-ip link set GTSc_tun mtu 1432
-ip link set GTSc_tun up
+ip addr add $net dev $intf
+ip link set $intf mtu $mtu
+ip link set $intf up
 
-# ip route add 10.7.0.0/24 dev GTSc_tun
-ip route add 220.181.57.217/32 dev GTSc_tun
+# Turn on NAT over GTS
+iptables -t nat -A POSTROUTING -o $intf -j MASQUERADE
+iptables -I FORWARD 1 -i $intf -m state --state RELATED,ESTABLISHED -j ACCEPT
+iptables -I FORWARD 1 -o $intf -j ACCEPT
+
+ip route add 10.7.0.0/24 dev GTSc_tun
+# ip route add 220.181.57.217/32 dev $intf
+
+ip route add $server via $(ip route show 0/0 | sed -e 's/.* via \([^ ]*\).*/\1/')
+ip route add   0/1 dev $intf
+ip route add 128/1 dev $intf
+
+echo $0 done
+
+

@@ -20,5 +20,6 @@ int api_request_parse(hash_ctx_t *ctx,char *data, gts_args_t *gts_args);
 char* generate_stat_info(hash_ctx_t *ctx);
 int init_log_file(char *filename);
 int write_pid_file(char *filename, pid_t pid);
+int set_env(gts_args_t *gts_args);
 
 #endif

@@ -1,12 +1,17 @@
 #!/bin/sh
 sysctl -w net.ipv4.ip_forward=1
 
-ip addr add 10.7.0.1/24 dev GTSs_tun
-ip link set GTSs_tun mtu 1432
-ip link set GTSs_tun up
+ip addr add $net dev $intf
+ip link set $intf mtu $mtu
+ip link set $intf up
 
-ip route add 10.7.0.0/24 dev GTSs_tun
+ip route add $net dev $intf
 
-iptables -t nat -A POSTROUTING -s 10.7.0.1/24 ! -d 10.7.0.1/24 -m comment --comment "GTS-server" -j MASQUERADE
-iptables -A FORWARD -s 10.7.0.1/24 -m state --state RELATED,ESTABLISHED -j ACCEPT
-iptables -A FORWARD -d 10.7.0.1/24 -j ACCEPT
+iptables -t nat -A POSTROUTING -s $net ! -d $net -m comment --comment "GTS-server" -j MASQUERADE
+iptables -A FORWARD -s $net -m state --state RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -d $net -j ACCEPT
+
+# Turn on MSS fix (MSS = MTU - TCP header - IP header)
+iptables -t mangle -A FORWARD -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+
+echo $0 done

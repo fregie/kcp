@@ -1,9 +1,12 @@
 {
-    "server":"127.0.0.1",
+    "server":"192.168.77.1",
     "port":6666,
     "header key":"1234ABCD",
-    "password":"789632145",
+    "password":"1234abcd",
     "token":"7e335d67f1dc2c",
+    "intf":"GTSc_tun",
+    "mtu":1432,
+    "net":"10.7.0.2/24",
     "logfile":"/var/log/GTS-client.log",
     "pidfile":"/var/run/GTS-server.pid"
 }

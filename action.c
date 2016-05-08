@@ -4,11 +4,11 @@
 #define PID_BUF_SIZE 32
 
 static const char *help_message =
-"usage: GTS-server config_file\n"
-"       GTS-client config_file\n"
-"example:GTS-server /etc/GTS/server.json\n"
-"        GTS-client /etc/GTS/client.json\n"
-"GTS-----geewan transmit system\n";
+"usage: GTS-server -c config_file\n"
+"       GTS-client -c config_file\n"
+"example:GTS-server -c /etc/GTS/server.json\n"
+"        GTS-client -c /etc/GTS/client.json\n"
+"GTS-----geewan transmit system\n\n";
 
 void print_help(){
   printf("%s",help_message);
@@ -300,6 +300,21 @@ int write_pid_file(char *filename, pid_t pid) {
     if (write(fd, buf, strlen(buf)) != strlen(buf)) {
         err("write");
         return -1;
+    }
+    return 0;
+}
+
+int set_env(gts_args_t *gts_args){
+    if (-1 == setenv("server", gts_args->server, 1)) {
+        err("setenv");
+    }
+    if (-1 == setenv("intf", gts_args->intf, 1)) {
+        err("setenv");
+    }
+    char *mtu = malloc(10);
+    sprintf(mtu, "%d",(int)gts_args->mtu);
+    if (-1 == setenv("mtu", mtu, 1)){
+        err("setenv");
     }
     return 0;
 }

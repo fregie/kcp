@@ -46,6 +46,28 @@ int json_parse(gts_args_t *gts_args, char *filename){
     }else{
         gts_args->log_file = strdup("/var/log/GTS-client.log");
     }
+    if (cJSON_HasObjectItem(json,"intf") == 1){
+        gts_args->intf =strdup(cJSON_GetObjectItem(json,"intf")->valuestring);
+    }else{
+        gts_args->intf = strdup("GTS_tun");
+    }
+    if (cJSON_HasObjectItem(json,"net") == 1){
+        char *net = strdup(cJSON_GetObjectItem(json,"net")->valuestring);
+        setenv("net", net, 1);
+        char *p = strchr(net, '/');
+        if (p) *p = 0;
+        in_addr_t addr = inet_addr(net);
+        gts_args->netip = ntohl((uint32_t)addr);
+        free(net);
+    }else{
+        printf("can't find netip");
+        return -1;
+    }
+    if (cJSON_HasObjectItem(json,"mtu") == 1){
+        gts_args->mtu = cJSON_GetObjectItem(json,"mtu")->valueint;
+    }else{
+        gts_args->mtu = TUN_MTU;
+    }
     gts_args->pid_file = strdup(cJSON_GetObjectItem(json,"pidfile")->valuestring);
     if (cJSON_HasObjectItem(json,"password") == 1 && cJSON_HasObjectItem(json,"token") == 1){
         if (gts_args->mode == GTS_MODE_SERVER){
@@ -133,18 +155,12 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
     if (gts_args->mode == GTS_MODE_SERVER){
         gts_args->shell_up = strdup("./samples/server_up.sh");
         gts_args->shell_down = strdup("./samples/server_down.sh");
-        gts_args->intf = strdup("GTSs_tun");
-        in_addr_t addr = inet_addr("10.7.0.1");
-        gts_args->netip = ntohl((uint32_t)addr);
     }else if (gts_args->mode == GTS_MODE_CLIENT){
         gts_args->shell_up = strdup("./samples/client_up.sh");
         gts_args->shell_down = strdup("./samples/client_down.sh");
-        gts_args->intf = strdup("GTSc_tun");
         gts_args->server_addr.sin_family = AF_INET;
         gts_args->server_addr.sin_port = htons(gts_args->port);
         gts_args->server_addr.sin_addr.s_addr = inet_addr(gts_args->server);
-        in_addr_t addr = inet_addr("10.7.0.2");
-        gts_args->netip = ntohl((uint32_t)addr);
     }else {
         printf("unknow mode");
         return -1;
@@ -159,7 +175,7 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
     gts_args->ver = 1;
     // gts_args->token = "ABCDEFG";
     
-    gts_args->mtu = TUN_MTU;
+    
     
     gts_args->udp_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
     gts_args->tun_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);

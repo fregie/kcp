@@ -20,7 +20,19 @@ static void sig_handler(int signo) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2){
+    int ch;
+    char *conf_file = NULL;
+    while ((ch = getopt(argc, argv, "hc:")) != -1){
+        switch (ch){
+        case 'c':
+            conf_file = strdup(optarg);
+            break;
+        default:
+            print_help();
+            break;
+        }
+    }
+    if (argc == 1 || conf_file == NULL){
         print_help();
         return EXIT_FAILURE;
     }
@@ -34,10 +46,11 @@ int main(int argc, char **argv) {
     hash_ctx = malloc(sizeof(hash_ctx_t));
     int length; //length of buffer recieved
     printf("GTS-server start....\n");
-    init_gts_args(gts_args, argv[1]);
+    init_gts_args(gts_args, conf_file);
     if(init_log_file(gts_args->log_file) == -1){
         errf("init log_file failed!");
     }
+    set_env(gts_args);
 /*    pid_t pid = getpid();
     if (0 != write_pid_file(gts_args->pid_file, pid)) {
         return EXIT_FAILURE;
