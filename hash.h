@@ -20,8 +20,8 @@ typedef struct {
   uint32_t input_tun_ip;
   // output tun IP
   uint32_t output_tun_ip;
-  int32_t rx;
-  int32_t tx;
+  int64_t rx;
+  int64_t tx;
 
   UT_hash_handle hh1;
   UT_hash_handle hh2;

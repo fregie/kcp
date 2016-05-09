@@ -5,6 +5,7 @@
 #include "cJSON.h"
 #include "log.h"
 #include "crypto.h"
+#include "b64.h"
 
 #include <stdint.h>
 #include <sys/types.h>

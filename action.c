@@ -5,9 +5,11 @@
 
 static const char *help_message =
 "usage: GTS-server -c config_file\n"
-"       GTS-client -c config_file\n"
-"example:GTS-server -c /etc/GTS/server.json\n"
-"        GTS-client -c /etc/GTS/client.json\n"
+"       GTS-client -c config_file -k header_key\n"
+"header_key of client is not necessary(if not provide here, it must be provided in config_file)\n"
+"header_key here must be encryped by des then encoee by base 64\n\n"
+"example:sudo GTS-server -c /etc/GTS/server.json\n"
+"        sudo GTS-client -c /etc/GTS/client.json\n"
 "GTS-----geewan transmit system\n\n";
 
 void print_help(){
@@ -36,7 +38,7 @@ int tun_create(const char *dev){
   
   if ((e = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0){
     errf("ioctl[TUNSETIFF]");
-    errf("can not setup tun device: %s", dev);
+    errf("can not setup tun device: %s \nplease run with root!", dev);
     close(fd);
     return -1;
   }
@@ -226,7 +228,6 @@ char* generate_stat_info(hash_ctx_t *ctx){
     for(client = ctx->token_to_clients; client != NULL; client=client->hh1.next){
         cJSON *user;
         cJSON_AddItemToArray(info, user = cJSON_CreateObject());
-        char *token = client->token;
         char *print_token = malloc(100);
         sprintf(print_token, "%2x%2x%2x%2x%2x%2x%2x",(uint8_t)client->token[0],
                 (uint8_t)client->token[1], (uint8_t)client->token[2],(uint8_t)client->token[3],
