@@ -59,8 +59,8 @@ int nat_fix_upstream(client_info_t *client, unsigned char *buf, size_t buflen){
                 errf("nat: tcp packet too short");
                 return -1;
             }
-            udp_hdr_t *udphdr = ip_payload;
-            ADJUST_CHECKSUM(acc, udphdr->checksum);
+            tcp_hdr_t *tcphdr = ip_payload;
+            ADJUST_CHECKSUM(acc, tcphdr->checksum);
         }else if(iphdr->proto == IPPROTO_UDP){
             if (buflen < iphdr_len + 8) {
                 errf("nat: udp packet too short");

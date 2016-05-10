@@ -26,7 +26,7 @@ int check_header(char *token, unsigned char *buf, key_set* key_sets){
     }
 }
 
-char* header_key_parse(char *password, char *header_key){
+unsigned char* header_key_parse(char *password, char *header_key){
     char *decode_header_key = b64_decode(header_key, 8);
     unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
     key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));

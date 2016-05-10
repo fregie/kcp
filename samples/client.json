@@ -1,9 +1,9 @@
 {
-    "server":"192.168.77.1",
+    "server":"118.184.30.116",
     "port":6666,
     "header key":"1234ABCD",
-    "password":"12345678",
-    "token":"ff593b9e6abeb2",
+    "password":"123456789",
+    "token":"e3c7b8db40a961",
     "intf":"GTSc_tun",
     "mtu":1432,
     "net":"10.7.0.2/24",
