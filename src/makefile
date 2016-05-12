@@ -31,6 +31,8 @@ decode.o:b64.h
 clean:
 	rm GTS-client GTS-server GTS-client.o GTS-server.o nat.o $(objects)
 install:
+	mkdir /usr/bin
+	mkdir /etc/GTS
 	cp ./GTS-server /usr/bin/
 	cp ./GTS-client /usr/bin/
 	cp ../samples/client.json ../samples/client_down.sh ../samples/client_up.sh /etc/GTS/
