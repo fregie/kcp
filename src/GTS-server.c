@@ -6,6 +6,8 @@
 #define ACT_OK "{\"status\":\"ok\"}"
 #define ACT_FAILED "{\"status\":\"failed\"}"
 
+char *shell_down;
+
 unsigned char* decrypt_header(unsigned char *buf, key_set* key_sets){
     unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
     process_message(buf, data_block, key_sets, DECRYPTION_MODE);
@@ -14,7 +16,7 @@ unsigned char* decrypt_header(unsigned char *buf, key_set* key_sets){
 }
 
 static void sig_handler(int signo) {
-    system("sh ./samples/server_down.sh");
+    system(shell_down);
     unlink(IPC_FILE);
     exit(0);
 }
@@ -50,6 +52,8 @@ int main(int argc, char **argv) {
     if(init_log_file(gts_args->log_file) == -1){
         errf("init log_file failed!");
     }
+    shell_down = malloc(strlen(gts_args->shell_down)+ 8);
+    sprintf(shell_down, "sh %s", gts_args->shell_down);
     set_env(gts_args);
 /*    pid_t pid = getpid();
     if (0 != write_pid_file(gts_args->pid_file, pid)) {
@@ -71,7 +75,9 @@ int main(int argc, char **argv) {
         errf("tun create failed!");
         return EXIT_FAILURE;
     }else{
-        system(gts_args->shell_up);
+        char *cmd = malloc(strlen(gts_args->shell_up) +8);
+        sprintf(cmd, "sh %s", gts_args->shell_up);
+        system(cmd);
     }
     fd_set readset;
     while (gts_args->ver == 1){

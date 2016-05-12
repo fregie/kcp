@@ -3,8 +3,10 @@
 
 #include <signal.h>
 
+char *shell_down;
+
 static void sig_handler(int signo) {
-    system("sh ./samples/client_down.sh");
+    system(shell_down);
     exit(0);
 }
 
@@ -74,6 +76,8 @@ int main(int argc, char **argv){
         gts_args->header_key = header_key_parse(gts_args->password, header_key);
     }
     free(header_key);
+    shell_down = malloc(strlen(gts_args->shell_down)+ 8);
+    sprintf(shell_down, "sh %s", gts_args->shell_down);
     set_env(gts_args);
 /*    pid_t pid = getpid();
     if (0 != write_pid_file(gts_args->pid_file, pid)) {
@@ -96,13 +100,15 @@ int main(int argc, char **argv){
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
     // init GTSc_tun
-    printf("creating tun");
+    printf("creating tun\n");
     gts_args->tun = tun_create(gts_args->intf);
      if (gts_args->tun < 0){
         errf("tun create failed!");
         return EXIT_FAILURE;
     }else{
-        system(gts_args->shell_up);
+        char *cmd = malloc(strlen(gts_args->shell_up) +8);
+        sprintf(cmd, "sh %s", gts_args->shell_up);
+        system(cmd);
     }
     // init UDP_sock
     struct sockaddr_in server_addr;

@@ -19,7 +19,7 @@ void print_help(){
 int tun_create(const char *dev){
   struct ifreq ifr;
   int fd, e;
-
+  printf("opening /dev/net/tun");
   if ((fd = open("/dev/net/tun", O_RDWR)) < 0) {
     errf("can not open /dev/net/tun");
     return -1;
@@ -35,7 +35,7 @@ int tun_create(const char *dev){
   ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
   if(*dev)
     strncpy(ifr.ifr_name, dev, IFNAMSIZ);
-  
+  printf("ioctl");
   if ((e = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0){
     errf("ioctl[TUNSETIFF]");
     errf("can not setup tun device: %s \nplease run with root!", dev);
