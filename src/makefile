@@ -33,6 +33,9 @@ clean:
 install:
 	cp ./GTS-server /usr/bin/
 	cp ./GTS-client /usr/bin/
+	cp ../samples/client.json ../samples/client_down.sh ../samples/client_up.sh /etc/GTS/
+	cp ../samples/server.json ../samples/server_down.sh ../samples/server_up.sh /etc/GTS/
 uninstall:
 	rm /usr/bin/GTS-server
 	rm /usr/bin/GTS-client
+	rm -r /etc/GTS/

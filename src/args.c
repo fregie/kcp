@@ -41,6 +41,18 @@ int json_parse(gts_args_t *gts_args, char *filename){
         printf("can't find header key\n");
         return -1;
     }
+    if (cJSON_HasObjectItem(json,"shell_up") == 1){
+        gts_args->shell_up = strdup(cJSON_GetObjectItem(json,"shell_up")->valuestring);
+    }else{
+        printf("can't find shell_up");
+        return -1;
+    }
+    if (cJSON_HasObjectItem(json,"shell_down") == 1){
+        gts_args->shell_down = strdup(cJSON_GetObjectItem(json,"shell_down")->valuestring);
+    }else{
+        printf("can't find shell_down");
+        return -1;
+    }
     if (cJSON_HasObjectItem(json,"logfile") == 1){
         gts_args->log_file = strdup(cJSON_GetObjectItem(json,"logfile")->valuestring);
     }else{
@@ -153,11 +165,8 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
     // gts_args->server = strdup("192.168.77.1");
     
     if (gts_args->mode == GTS_MODE_SERVER){
-        gts_args->shell_up = strdup("./samples/server_up.sh");
-        gts_args->shell_down = strdup("./samples/server_down.sh");
+        
     }else if (gts_args->mode == GTS_MODE_CLIENT){
-        gts_args->shell_up = strdup("./samples/client_up.sh");
-        gts_args->shell_down = strdup("./samples/client_down.sh");
         gts_args->server_addr.sin_family = AF_INET;
         gts_args->server_addr.sin_port = htons(gts_args->port);
         gts_args->server_addr.sin_addr.s_addr = inet_addr(gts_args->server);

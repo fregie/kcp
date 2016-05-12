@@ -7,6 +7,8 @@
     "intf":"GTSs_tun",
     "mtu":1432,
     "net":"10.7.0.1/24",
+    "shell_up":"/etc/GTS/server_up.sh",
+    "shell_down":"/etc/GTS/server_down.sh",
     "logfile":"/var/log/GTS-server.log",
     "pidfile":"/var/run/GTS-server.pid"
 }
