@@ -96,6 +96,7 @@ int main(int argc, char **argv){
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
     // init GTSc_tun
+    printf("creating tun");
     gts_args->tun = tun_create(gts_args->intf);
      if (gts_args->tun < 0){
         errf("tun create failed!");

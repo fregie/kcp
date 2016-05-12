@@ -1,4 +1,5 @@
 #include <sodium.h>
+#include "crypto_secretbox_salsa208poly1305.h"
 
 int crypto_secretbox_salsa208poly1305(
   unsigned char *c,

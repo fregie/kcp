@@ -1,0 +1,25 @@
+#!/bin/sh /etc/rc.common
+# GTS init script
+
+#START=90
+#STOP=15
+
+start()
+{
+    GTS-client -c /etc/GTS/client.json
+}
+
+boot()
+{
+    if [ ! -c "/dev/net/tun" ]; then
+        mkdir -p /dev/net
+        mknod /dev/net/tun c 10 200
+        chmod 0666 /dev/net/tun
+    fi
+    start
+}
+
+stop()
+{
+    killall GTS-client
+}

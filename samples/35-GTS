@@ -1,0 +1,12 @@
+# hotplug.d for OpenWRT
+
+[ ifup = "$ACTION" ] && {
+  [ wan = "$INTERFACE" ] && {
+    /etc/init.d/GTS start
+  }
+}
+[ ifdown = "$ACTION" ] && {
+  [ wan = "$INTERFACE" ] && {
+    /etc/init.d/GTS stop
+  }
+}
