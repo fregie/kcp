@@ -9,16 +9,16 @@ static void sig_handler(int signo) {
     system(shell_down);
     exit(0);
 }
-
 int check_header(char *token, unsigned char *buf, key_set* key_sets){
     unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
     process_message(buf, data_block, key_sets, DECRYPTION_MODE);
     data_block[8] = 0;
+    print_hex_memory(data_block, 8);
     if (data_block[0] != 1){
         errf("version check failed");
         free(data_block);
         return 1;
-    }else if(strcmp(token, data_block+1) != 0){
+    }else if(memcmp(token, data_block+1, TOKEN_LEN) != 0){
         errf("unknow token");
         free(data_block);
         return 2;
@@ -100,7 +100,6 @@ int main(int argc, char **argv){
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
     // init GTSc_tun
-    printf("creating tun\n");
     gts_args->tun = tun_create(gts_args->intf);
      if (gts_args->tun < 0){
         errf("tun create failed!");

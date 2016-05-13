@@ -21,7 +21,7 @@ log.o:log.h
 crypto.o:crypto.h crypto_secretbox_salsa208poly1305.h
 	$(CC) -c crypto.c -g
 crypto_secretbox_salsa208poly1305.o:crypto_secretbox_salsa208poly1305.h
-	$(CC) $(CFLAGS) $(LDFLAGS) -c crypto_secretbox_salsa208poly1305.c -g
+	$(CC) -c crypto_secretbox_salsa208poly1305.c -g
 hash.o:args.h hash.h
 	$(CC) -c hash.c -g
 nat.o:nat.h hash.h
