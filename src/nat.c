@@ -12,7 +12,15 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#define ADD_CHECKSUM_32(acc, u32){ \
+    acc += (u32) & 0xffff; \
+    acc += (u32) >> 16; \
+}
 
+#define SUB_CHECKSUM_32(acc, u32){ \
+    acc -= (u32) & 0xffff; \
+    acc -= (u32) >> 16; \
+}
 
 // acc is the changes (+ old - new)
 // cksum is the checksum to adjust
@@ -49,7 +57,8 @@ int nat_fix_upstream(client_info_t *client, unsigned char *buf, size_t buflen){
     client->input_tun_ip = iphdr->saddr;
     
     iphdr->saddr = client->output_tun_ip;
-    acc = client->input_tun_ip - iphdr->saddr;
+    ADD_CHECKSUM_32(acc, client->input_tun_ip);
+    SUB_CHECKSUM_32(acc, iphdr->saddr)
     ADJUST_CHECKSUM(acc, iphdr->checksum);
     
     if (0 == (iphdr->frag & htons(0x1fff))){
@@ -94,7 +103,8 @@ client_info_t* nat_fix_downstream(hash_ctx_t *hash_ctx, unsigned char *buf, size
         return NULL;
     }
     int32_t acc = 0;
-    acc = iphdr->daddr - client->input_tun_ip;
+    ADD_CHECKSUM_32(acc, iphdr->daddr);
+    SUB_CHECKSUM_32(acc, client->input_tun_ip);
     iphdr->daddr = client->input_tun_ip;
     ADJUST_CHECKSUM(acc, iphdr->checksum);
     
