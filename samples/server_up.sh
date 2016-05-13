@@ -5,8 +5,6 @@ ip addr add $net dev $intf
 ip link set $intf mtu $mtu
 ip link set $intf up
 
-ip route add $net dev $intf
-
 iptables -t nat -A POSTROUTING -s $net ! -d $net -m comment --comment "GTS-server" -j MASQUERADE
 iptables -A FORWARD -s $net -m state --state RELATED,ESTABLISHED -j ACCEPT
 iptables -A FORWARD -d $net -j ACCEPT
