@@ -37,8 +37,6 @@ typedef enum{
     GTS_MODE_CLIENT = 2
 } gts_mode;
 
-
-
 typedef struct{
   gts_mode mode;
   uint16_t port;

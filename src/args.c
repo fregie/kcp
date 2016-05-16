@@ -39,7 +39,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
         gts_args->header_key = strdup(cJSON_GetObjectItem(json,"header key")->valuestring);
     }else{
         printf("can't find header key\n");
-        return -1;
+        gts_args->header_key = strdup("fregieonly");
     }
     if (cJSON_HasObjectItem(json,"shell_up") == 1){
         gts_args->shell_up = strdup(cJSON_GetObjectItem(json,"shell_up")->valuestring);
