@@ -7,7 +7,7 @@ static const char *help_message =
 "usage: GTS-server -c config_file\n"
 "       GTS-client -c config_file -k header_key\n"
 "header_key of client is not necessary(if not provide here, it must be provided in config_file)\n"
-"header_key here must be encryped by des then encoee by base 64\n\n"
+"header_key here must be encryped by des then encode by base 64\n\n"
 "example:sudo GTS-server -c /etc/GTS/server.json\n"
 "        sudo GTS-client -c /etc/GTS/client.json\n"
 "GTS-----geewan transmit system\n\n";
@@ -113,14 +113,10 @@ fd_set init_select(gts_args_t *gts_args){
     FD_ZERO(&readset);
     FD_SET(gts_args->tun, &readset);
     FD_SET(gts_args->UDP_sock, &readset);
-    if(gts_args->mode == GTS_MODE_SERVER){
-      FD_SET(gts_args->IPC_sock, &readset);
-    }
+    FD_SET(gts_args->IPC_sock, &readset);
     max_fd = max(gts_args->tun, max_fd);
     max_fd = max(gts_args->UDP_sock, max_fd);
-    if(gts_args->mode == GTS_MODE_SERVER){
-      max_fd = max(gts_args->IPC_sock, max_fd);
-    }
+    max_fd = max(gts_args->IPC_sock, max_fd);
     select(max_fd+1, &readset, NULL, NULL, NULL);
     return readset;
 }

@@ -1,7 +1,7 @@
 {
     "server":"0.0.0.0",
     "port":6666,
-    "header key":"1234ABCD",
+    "header key":"1234ABCE",
     "password":["1234abcd","12345678","123456789"],
     "token":["7e335d67f1dc2c","ff593b9e6abeb2","e3c7b8db40a961"],
     "intf":"GTSs_tun",
