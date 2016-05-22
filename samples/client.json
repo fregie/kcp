@@ -1,14 +1,14 @@
 {
-    "server":"192.168.77.1",
+    "server":"192.168.77.128",
     "port":6666,
     "header key":"1234ABCE",
-    "password":"123456789",
-    "token":"e3c7b8db40a962",
+    "password":"12345678",
+    "token":"ff593b9e6abeb2",
     "intf":"GTSc_tun",
     "mtu":1432,
     "net":"10.7.0.2/24",
+    "encrypt":1,
     "shell_up":"/etc/GTS/client_up.sh",
     "shell_down":"/etc/GTS/client_down.sh",
-    "logfile":"/var/log/GTS-client.log",
-    "pidfile":"/var/run/GTS-server.pid"
+    "logfile":"/var/log/GTS-client.log"
 }

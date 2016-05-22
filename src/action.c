@@ -156,7 +156,9 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
                 break;
             }
         }
-        client->password = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
+        if (gts_args->encrypt == 1){
+            client->password = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
+        }
         key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
         generate_sub_keys(gts_args->header_key, key_sets);
         client->encrypted_header = encrypt_GTS_header(&gts_args->ver, client->token, key_sets);

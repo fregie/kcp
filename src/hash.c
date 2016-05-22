@@ -8,7 +8,9 @@ int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args){
         bzero(client, sizeof(client_info_t));
 
         memcpy(client->token, gts_args->token[i], TOKEN_LEN);
-        client->password = strdup(gts_args->password[i]);
+        if (gts_args->encrypt == 1){
+            client->password = strdup(gts_args->password[i]);
+        }
         key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
         generate_sub_keys(gts_args->header_key, key_sets);
         client->encrypted_header = encrypt_GTS_header(&gts_args->ver, gts_args->token[i], key_sets);

@@ -41,14 +41,30 @@ int json_parse(gts_args_t *gts_args, char *filename){
         printf("can't find header key\n");
         gts_args->header_key = strdup("fregieonly");
     }
+    if (cJSON_HasObjectItem(json,"encrypt") == 1){
+        gts_args->encrypt = cJSON_GetObjectItem(json,"port")->valueint;
+        if(gts_args->encrypt != 0){
+            gts_args->encrypt = 1;
+        }
+    }else{
+        gts_args->encrypt = 0;
+    }
     if (cJSON_HasObjectItem(json,"shell_up") == 1){
         gts_args->shell_up = strdup(cJSON_GetObjectItem(json,"shell_up")->valuestring);
+        if (access(gts_args->shell_up, R_OK) == -1){
+            errf("GTS up script can't find");
+            return -1;
+        }
     }else{
         printf("can't find shell_up");
         return -1;
     }
     if (cJSON_HasObjectItem(json,"shell_down") == 1){
         gts_args->shell_down = strdup(cJSON_GetObjectItem(json,"shell_down")->valuestring);
+        if (access(gts_args->shell_down, R_OK) == -1){
+            errf("GTS down script can't find");
+            return -1;
+        }
     }else{
         printf("can't find shell_down");
         return -1;
@@ -81,21 +97,23 @@ int json_parse(gts_args_t *gts_args, char *filename){
         gts_args->mtu = TUN_MTU;
     }
     gts_args->pid_file = strdup(cJSON_GetObjectItem(json,"pidfile")->valuestring);
-    if (cJSON_HasObjectItem(json,"password") == 1 && cJSON_HasObjectItem(json,"token") == 1){
+    if (cJSON_HasObjectItem(json,"token") == 1){
         if (gts_args->mode == GTS_MODE_SERVER){
-            if (cJSON_GetArraySize(cJSON_GetObjectItem(json,"password")) != cJSON_GetArraySize(cJSON_GetObjectItem(json,"token"))){
-                printf("token numbers != password numbers\n");
-                return -1;
+            if (gts_args->encrypt == 1){
+                if (cJSON_GetArraySize(cJSON_GetObjectItem(json,"password")) != cJSON_GetArraySize(cJSON_GetObjectItem(json,"token"))){
+                    printf("token numbers != password numbers\n");
+                    return -1;
+                }
+                //init password
+                gts_args->password = malloc(MAX_USER*sizeof(char*));
+                password = cJSON_GetObjectItem(json,"password")->child;
+                int k = 0;
+                while (password != 0){
+                    gts_args->password[k] = strdup(password->valuestring);
+                    password = password->next;
+                    k++;
+                } 
             }
-            //init password
-            gts_args->password = malloc(MAX_USER*sizeof(char*));
-            password = cJSON_GetObjectItem(json,"password")->child;
-            int k = 0;
-            while (password != 0){
-                gts_args->password[k] = strdup(password->valuestring);
-                password = password->next;
-                k++;
-            } 
             //init tokens
             gts_args->token = malloc(MAX_USER*sizeof(char*));
             token_json = cJSON_GetObjectItem(json,"token")->child;
@@ -121,13 +139,17 @@ int json_parse(gts_args_t *gts_args, char *filename){
                 token_json = token_json->next;
             }
         }else if(gts_args->mode == GTS_MODE_CLIENT){
-            gts_args->password = malloc(sizeof(char*));
-            if (cJSON_HasObjectItem(json,"password") == 1){
-                gts_args->password[0] = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
-            }else{
-                printf("can't find password\n");
-                return -1;
+            if (gts_args->encrypt == 1){
+                //init password
+                gts_args->password = malloc(sizeof(char*));
+                if (cJSON_HasObjectItem(json,"password") == 1){
+                    gts_args->password[0] = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
+                }else{
+                    printf("can't find password\n");
+                    return -1;
+                }
             }
+            // init token
             gts_args->token = malloc(sizeof(char*));
             gts_args->token[0] = malloc(TOKEN_LEN);
             char *value;
@@ -158,11 +180,8 @@ int json_parse(gts_args_t *gts_args, char *filename){
 
 int init_gts_args(gts_args_t *gts_args,char *conf_file){
     if (0 != json_parse(gts_args, conf_file)){
-        printf("json parse failed");
         return -1;
     }
-    // gts_args->port = 6666;
-    // gts_args->server = strdup("192.168.77.1");
     
     if (gts_args->mode == GTS_MODE_SERVER){
         
@@ -174,17 +193,7 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
         printf("unknow mode");
         return -1;
     }
-    // gts_args->header_key = strdup("1234ABCD");
-    
-    // gts_args->GTS_header_len = 32;
-    // gts_args->ver_len = 1;
-    // gts_args->token_len = 7;
-    // gts_args->nonce_len = 8; 
-    // gts_args->auth_info_len = 16;
-    gts_args->ver = 1;
-    // gts_args->token = "ABCDEFG";
-    
-    
+    gts_args->ver = GTS_VER;
     
     gts_args->udp_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
     gts_args->tun_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
