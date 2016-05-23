@@ -3,8 +3,8 @@
 
 #include <signal.h>
 
-char *shell_down;
-uint8_t stat_code = 0;
+static char *shell_down;
+static uint8_t stat_code = STAT_OK;
     /*
     return client status:
     0..........status OK
@@ -27,12 +27,12 @@ int check_header(char *token, unsigned char *buf, key_set* key_sets){
     data_block[8] = 0;
     // print_hex_memory(data_block, 8);
     if (data_block[0] != 1){
-        stat_code = 3;
+        stat_code = HEADER_KEY_ERR;
         errf("version check failed");
         free(data_block);
         return 1;
     }else if(memcmp(token, data_block+1, TOKEN_LEN) != 0){
-        stat_code = 1;
+        stat_code = TOKEN_ERR;
         errf("unknow token");
         free(data_block);
         return 2;
@@ -42,7 +42,7 @@ int check_header(char *token, unsigned char *buf, key_set* key_sets){
     }
 }
 
-unsigned char* header_key_parse(char *password, char *header_key){
+unsigned char* header_key_parse(unsigned char *password, char *header_key){
     char *decode_header_key = b64_decode(header_key, 8);
     unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
     key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
@@ -87,16 +87,12 @@ int main(int argc, char **argv){
         errf("init log_file failed!");
     }
     if (header_key != NULL){
-        gts_args->header_key = header_key_parse(gts_args->password, header_key);
+        gts_args->header_key = header_key_parse(gts_args->password[0], header_key);
     }
     free(header_key);
     shell_down = malloc(strlen(gts_args->shell_down)+ 8);
     sprintf(shell_down, "sh %s", gts_args->shell_down);
     set_env(gts_args);
-/*    pid_t pid = getpid();
-    if (0 != write_pid_file(gts_args->pid_file, pid)) {
-        return EXIT_FAILURE;
-    }*/
     //make encrypted_header
     key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
     generate_sub_keys(gts_args->header_key, key_sets);
@@ -145,8 +141,15 @@ int main(int argc, char **argv){
                             gts_args->mtu + GTS_HEADER_LEN, 0,
                             (struct sockaddr*)&gts_args->remote_addr,
                             (socklen_t*)&gts_args->remote_addr_len);
-            if (gts_args->udp_buf[0] == 78){
+            if (gts_args->udp_buf[0] == ERR_FLAG){
                 stat_code = gts_args->udp_buf[1];
+                if (stat_code == TOKEN_ERR){
+                    errf("token error");
+                }else if(stat_code == PASSWORD_ERR){
+                    errf("password error");
+                }else if(stat_code == HEADER_KEY_ERR){
+                    errf("header key error");
+                }
                 continue;
             }
                             
@@ -155,11 +158,11 @@ int main(int argc, char **argv){
             }
             if (-1 == crypto_decrypt(gts_args->tun_buf, gts_args->udp_buf,
                                     length - GTS_HEADER_LEN)){
-                stat_code = 2;
+                stat_code = PASSWORD_ERR;
                 errf("dropping invalid packet, maybe wrong password");
             }
             write(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
-            stat_code = 0;
+            stat_code = STAT_OK;
         }
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, gts_args->mtu);

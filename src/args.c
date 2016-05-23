@@ -43,14 +43,22 @@ int json_parse(gts_args_t *gts_args, char *filename){
     }
     if (cJSON_HasObjectItem(json,"shell_up") == 1){
         gts_args->shell_up = strdup(cJSON_GetObjectItem(json,"shell_up")->valuestring);
+        if (access(gts_args->shell_up, R_OK) == -1){
+            errf("GTS up script can't find");
+            return -1;
+        }
     }else{
-        printf("can't find shell_up");
+        printf("can't find up script");
         return -1;
     }
     if (cJSON_HasObjectItem(json,"shell_down") == 1){
         gts_args->shell_down = strdup(cJSON_GetObjectItem(json,"shell_down")->valuestring);
+        if (access(gts_args->shell_down, R_OK) == -1){
+            errf("GTS down script can't find");
+            return -1;
+        }
     }else{
-        printf("can't find shell_down");
+        printf("can't find down script");
         return -1;
     }
     if (cJSON_HasObjectItem(json,"logfile") == 1){
@@ -161,8 +169,6 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
         printf("json parse failed");
         return -1;
     }
-    // gts_args->port = 6666;
-    // gts_args->server = strdup("192.168.77.1");
     
     if (gts_args->mode == GTS_MODE_SERVER){
         
@@ -174,15 +180,7 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
         printf("unknow mode");
         return -1;
     }
-    // gts_args->header_key = strdup("1234ABCD");
-    
-    // gts_args->GTS_header_len = 32;
-    // gts_args->ver_len = 1;
-    // gts_args->token_len = 7;
-    // gts_args->nonce_len = 8; 
-    // gts_args->auth_info_len = 16;
-    gts_args->ver = 1;
-    // gts_args->token = "ABCDEFG";
+    gts_args->ver = GTS_VER;
     
     
     

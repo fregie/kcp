@@ -3,7 +3,7 @@
     "port":6666,
     "header key":"1234ABCE",
     "password":"123456789",
-    "token":"e3c7b8db40a962",
+    "token":"e3c7b8db40a961",
     "intf":"GTSc_tun",
     "mtu":1432,
     "net":"10.7.0.2/24",

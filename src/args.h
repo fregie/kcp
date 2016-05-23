@@ -23,6 +23,7 @@
 #include <sys/select.h>
 #include <sodium.h>
 
+#define GTS_VER 1
 #define IPC_FILE "/tmp/GTS.sock"
 #define MAX_USER 20
 #define TUN_MTU 1432  // 1492 (Ethernet) - 20 (IPv4, or 40 for IPv6) - 8 (UDP) - 32 (GTS header)
@@ -31,6 +32,12 @@
 #define TOKEN_LEN 7
 #define NONCE_LEN 8
 #define AUTH_INFO_LEN 16
+
+#define ERR_FLAG 78
+#define STAT_OK 0
+#define TOKEN_ERR 1
+#define PASSWORD_ERR 2
+#define HEADER_KEY_ERR 3
 
 typedef enum{
     GTS_MODE_SERVER = 1,

@@ -6,8 +6,7 @@
 #define ACT_OK "{\"status\":\"ok\"}"
 #define ACT_FAILED "{\"status\":\"failed\"}"
 
-char *shell_down;
-int err_code = 0;
+static char *shell_down = NULL;
 
 
 unsigned char* decrypt_header(unsigned char *buf, key_set* key_sets){
@@ -17,9 +16,9 @@ unsigned char* decrypt_header(unsigned char *buf, key_set* key_sets){
     return data_block;
 }
 
-char* err_msg(uint8_t err_code){
+unsigned char* err_msg(uint8_t err_code){
     unsigned char* err_msg = malloc(2);
-    err_msg[0] = 78;
+    err_msg[0] = ERR_FLAG;
     err_msg[1] = err_code;
     return err_msg;
 }
@@ -114,7 +113,7 @@ int main(int argc, char **argv) {
             unsigned char* header = decrypt_header(gts_args->udp_buf, key_sets);
             if (header[0] != 1){
                 errf("version check failed,drop!");
-                char *msg = err_msg(3);
+                unsigned char *msg = err_msg((uint8_t)HEADER_KEY_ERR);
                 sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
                 free(msg);
                 free(header);
@@ -124,7 +123,7 @@ int main(int argc, char **argv) {
             HASH_FIND(hh1, hash_ctx->token_to_clients, header+VER_LEN, TOKEN_LEN, client);
             if(client == NULL){
                 errf("unknow token, drop!");
-                char *msg = err_msg(1);
+                unsigned char *msg = err_msg((uint8_t)TOKEN_ERR);
                 sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
                 free(msg);
                 free(header);
@@ -143,7 +142,7 @@ int main(int argc, char **argv) {
             if (-1 == crypto_decrypt(gts_args->tun_buf, gts_args->udp_buf,
                                     length - GTS_HEADER_LEN)){
                 errf("dropping invalid packet, maybe wrong password");
-                char *msg = err_msg(2);
+                unsigned char *msg = err_msg((uint8_t)PASSWORD_ERR);
                 sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
                 free(msg);
                 continue;
