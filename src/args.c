@@ -96,7 +96,6 @@ int json_parse(gts_args_t *gts_args, char *filename){
     }else{
         gts_args->mtu = TUN_MTU;
     }
-    gts_args->pid_file = strdup(cJSON_GetObjectItem(json,"pidfile")->valuestring);
     if (cJSON_HasObjectItem(json,"token") == 1){
         if (gts_args->mode == GTS_MODE_SERVER){
             if (gts_args->encrypt == 1){

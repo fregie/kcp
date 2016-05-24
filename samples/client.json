@@ -1,5 +1,5 @@
 {
-    "server":"192.168.77.128",
+    "server":"192.168.77.1",
     "port":6666,
     "header key":"1234ABCE",
     "password":"12345678",

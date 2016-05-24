@@ -190,7 +190,8 @@ int main(int argc, char **argv){
         }
         //recv from unix domain socket 
         if (FD_ISSET(gts_args->IPC_sock, &readset)){
-            char rx_buf[500];
+            char rx_buf[MAX_IPC_LEN];
+            bzero(rx_buf, MAX_IPC_LEN);
             struct sockaddr_un pmapi_addr;
             int len = sizeof(pmapi_addr);
             int recvSize = recvfrom(gts_args->IPC_sock, rx_buf, sizeof(rx_buf), 0,
@@ -205,10 +206,13 @@ int main(int argc, char **argv){
             act = strdup(cJSON_GetObjectItem(json,"act")->valuestring);
             if (strcmp(act,"show_stat") == 0){
                 char *msg = malloc(20);
-                sprintf(msg, "{\"stat\":%d}", stat_code);
+                if (snprintf(msg, 20,"{\"stat\":%d}", stat_code) > 20){
+                    errf("msg too long");
+                } 
                 sendto(gts_args->IPC_sock, msg, strlen(msg),0, (struct sockaddr*)&pmapi_addr, len);
                 free(msg);
             }else{
+                
                 errf("unknow act");
                 continue;
             }

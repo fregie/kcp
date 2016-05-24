@@ -175,7 +175,8 @@ int main(int argc, char **argv) {
             }
         }
         if (FD_ISSET(gts_args->IPC_sock, &readset)){
-                char rx_buf[500];
+                char rx_buf[MAX_IPC_LEN];
+                bzero(rx_buf, MAX_IPC_LEN);
                 struct sockaddr_un pmapi_addr;
                 int len = sizeof(pmapi_addr);
                 int recvSize = recvfrom(gts_args->IPC_sock, rx_buf, sizeof(rx_buf), 0,
