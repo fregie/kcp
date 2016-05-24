@@ -139,11 +139,11 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         errf("request parse failed");
         return -1;
     }
-    act = strdup(cJSON_GetObjectItem(json,"act")->valuestring);
+    act = cJSON_GetObjectItem(json,"act")->valuestring;
     if (strcmp(act,"add_user") == 0){
         client_info_t *client = malloc(sizeof(client_info_t));
         bzero(client, sizeof(client_info_t));
-        char *token = strdup(cJSON_GetObjectItem(json,"token")->valuestring);
+        char *token = cJSON_GetObjectItem(json,"token")->valuestring;
         int p = 0;
         while (p < 7){
             unsigned int temp;
@@ -157,7 +157,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             }
         }
         if (gts_args->encrypt == 1){
-            client->password = strdup(cJSON_GetObjectItem(json,"password")->valuestring);
+            client->password = cJSON_GetObjectItem(json,"password")->valuestring;
         }
         key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
         generate_sub_keys(gts_args->header_key, key_sets);
@@ -183,7 +183,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         HASH_ADD(hh2, ctx->ip_to_clients, output_tun_ip, 4, client);
         return 0;
     }else if(strcmp(act,"del_user") == 0){
-        char *token = strdup(cJSON_GetObjectItem(json,"token")->valuestring);
+        char *token = cJSON_GetObjectItem(json,"token")->valuestring;
         char real_token[TOKEN_LEN];
         int p = 0;
         while (p < 7){

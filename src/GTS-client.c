@@ -131,11 +131,11 @@ int main(int argc, char **argv){
     
     fd_set readset;
     //start working!
-    while (gts_args->ver == 1){
+    while (1){
         readset = init_select(gts_args);    //select udp_socket and tun
         
-        bzero(gts_args->udp_buf, gts_args->mtu + GTS_HEADER_LEN);
-        bzero(gts_args->tun_buf, gts_args->mtu + GTS_HEADER_LEN);
+        // bzero(gts_args->udp_buf, gts_args->mtu + GTS_HEADER_LEN);
+        // bzero(gts_args->tun_buf, gts_args->mtu + GTS_HEADER_LEN);
         //recv from server and write to tun
         if (FD_ISSET(gts_args->UDP_sock, &readset)){
             length = recvfrom(gts_args->UDP_sock, gts_args->udp_buf,
@@ -191,7 +191,7 @@ int main(int argc, char **argv){
         //recv from unix domain socket 
         if (FD_ISSET(gts_args->IPC_sock, &readset)){
             char rx_buf[MAX_IPC_LEN];
-            bzero(rx_buf, MAX_IPC_LEN);
+            // bzero(rx_buf, MAX_IPC_LEN);
             struct sockaddr_un pmapi_addr;
             int len = sizeof(pmapi_addr);
             int recvSize = recvfrom(gts_args->IPC_sock, rx_buf, sizeof(rx_buf), 0,
