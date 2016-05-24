@@ -56,7 +56,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
             return -1;
         }
     }else{
-        printf("can't find shell_up");
+        printf("can't find up script");
         return -1;
     }
     if (cJSON_HasObjectItem(json,"shell_down") == 1){
@@ -66,7 +66,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
             return -1;
         }
     }else{
-        printf("can't find shell_down");
+        printf("can't find down script");
         return -1;
     }
     if (cJSON_HasObjectItem(json,"logfile") == 1){
@@ -193,6 +193,11 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
         return -1;
     }
     gts_args->ver = GTS_VER;
+<<<<<<< HEAD
+=======
+    
+    
+>>>>>>> ab7b2d0cac51fdb5a9a096d4a9b1a910c31bdbb9
     
     gts_args->udp_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
     gts_args->tun_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);

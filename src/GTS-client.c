@@ -142,7 +142,7 @@ int main(int argc, char **argv){
                             gts_args->mtu + GTS_HEADER_LEN, 0,
                             (struct sockaddr*)&gts_args->remote_addr,
                             (socklen_t*)&gts_args->remote_addr_len);
-            if (gts_args->udp_buf[0] == 78){
+            if (gts_args->udp_buf[0] == ERR_FLAG){
                 stat_code = gts_args->udp_buf[1];
                 if (stat_code == TOKEN_ERR){
                     errf("token error");

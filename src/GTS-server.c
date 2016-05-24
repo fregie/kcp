@@ -99,7 +99,11 @@ int main(int argc, char **argv) {
             unsigned char* header = decrypt_header(gts_args->udp_buf, key_sets);
             if (header[0] != 1){
                 errf("version check failed,drop!");
+<<<<<<< HEAD
                 unsigned char *msg = err_msg(HEADER_KEY_ERR);
+=======
+                unsigned char *msg = err_msg((uint8_t)HEADER_KEY_ERR);
+>>>>>>> ab7b2d0cac51fdb5a9a096d4a9b1a910c31bdbb9
                 sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
                 free(msg);
                 free(header);
@@ -109,7 +113,11 @@ int main(int argc, char **argv) {
             HASH_FIND(hh1, hash_ctx->token_to_clients, header+VER_LEN, TOKEN_LEN, client);
             if(client == NULL){
                 errf("unknow token, drop!");
+<<<<<<< HEAD
                 unsigned char *msg = err_msg(TOKEN_ERR);
+=======
+                unsigned char *msg = err_msg((uint8_t)TOKEN_ERR);
+>>>>>>> ab7b2d0cac51fdb5a9a096d4a9b1a910c31bdbb9
                 sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
                 free(msg);
                 free(header);
@@ -121,6 +129,7 @@ int main(int argc, char **argv) {
             client->source_addr.addrlen = temp_remote_addrlen;
             memcpy(&client->source_addr.addr, &temp_remote_addr, temp_remote_addrlen);
             
+<<<<<<< HEAD
             if (gts_args->encrypt == 1){
                 if (0 !=crypto_set_password(client->password, strlen(client->password))) {
                     errf("can not find password");
@@ -143,6 +152,22 @@ int main(int argc, char **argv) {
                     continue;
                 }
                 write(gts_args->tun, gts_args->udp_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
+=======
+            if (0 !=crypto_set_password(client->password, strlen(client->password))) {
+                errf("can not find password");
+                continue;
+            }
+            if (-1 == crypto_decrypt(gts_args->tun_buf, gts_args->udp_buf,
+                                    length - GTS_HEADER_LEN)){
+                errf("dropping invalid packet, maybe wrong password");
+                unsigned char *msg = err_msg((uint8_t)PASSWORD_ERR);
+                sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
+                free(msg);
+                continue;
+            }
+            if (-1 == nat_fix_upstream(client, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN)){
+                continue;
+>>>>>>> ab7b2d0cac51fdb5a9a096d4a9b1a910c31bdbb9
             }
         }
         // recv data from tun
