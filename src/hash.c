@@ -3,6 +3,8 @@
 int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args){
     int i;
     bzero(ctx, sizeof(hash_ctx_t));
+    DES_key_schedule ks;
+    DES_set_key_unchecked((const_DES_cblock*)gts_args->header_key, &ks);
     for (i = 0; i < gts_args->token_len; i++) {
         client_info_t *client = malloc(sizeof(client_info_t));
         bzero(client, sizeof(client_info_t));
@@ -11,10 +13,7 @@ int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args){
         if (gts_args->encrypt == 1){
             client->password = strdup(gts_args->password[i]);
         }
-        key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
-        generate_sub_keys(gts_args->header_key, key_sets);
-        client->encrypted_header = encrypt_GTS_header(&gts_args->ver, gts_args->token[i], key_sets);
-        free(key_sets);
+        client->encrypted_header = encrypt_GTS_header(&gts_args->ver, gts_args->token[i], &ks);
         // assign IP based on tun IP and user tokens
         // for example:
         //     tun IP is 10.7.0.1

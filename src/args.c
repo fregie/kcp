@@ -42,7 +42,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
         gts_args->header_key = strdup("fregieonly");
     }
     if (cJSON_HasObjectItem(json,"encrypt") == 1){
-        gts_args->encrypt = cJSON_GetObjectItem(json,"port")->valueint;
+        gts_args->encrypt = cJSON_GetObjectItem(json,"encrypt")->valueint;
         if(gts_args->encrypt != 0){
             gts_args->encrypt = 1;
         }

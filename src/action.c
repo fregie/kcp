@@ -121,14 +121,14 @@ fd_set init_select(gts_args_t *gts_args){
     return readset;
 }
 
-unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, key_set* key_sets){
-    unsigned char* data_block = (unsigned char*) malloc(8*sizeof(char));
-    unsigned char* encrypted_header = (unsigned char*) malloc(8*sizeof(char));
+unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, DES_key_schedule* ks){
+    unsigned char* data_block = malloc(8*sizeof(char));
+    unsigned char* encrypted_header = malloc(8*sizeof(char));
     memcpy(data_block, ver,VER_LEN);
     memcpy(data_block + VER_LEN, token, TOKEN_LEN);
-    process_message(data_block, encrypted_header, key_sets, ENCRYPTION_MODE);
+    DES_ecb_encrypt((const_DES_cblock*)data_block, (DES_cblock*)encrypted_header, ks, DES_ENCRYPT);
     free(data_block);
-    return encrypted_header;
+    return (unsigned char*)encrypted_header;
 }
 
 int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
@@ -159,14 +159,13 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         if (gts_args->encrypt == 1){
             client->password = cJSON_GetObjectItem(json,"password")->valuestring;
         }
-        key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
-        generate_sub_keys(gts_args->header_key, key_sets);
-        client->encrypted_header = encrypt_GTS_header(&gts_args->ver, client->token, key_sets);
-        free(key_sets);
+        DES_key_schedule ks;
+        DES_set_key_unchecked((const_DES_cblock*)gts_args->header_key, &ks);
+        client->encrypted_header = encrypt_GTS_header(&gts_args->ver, client->token, &ks);
         client->rx = 0;
         client->tx = 0;
         int i;
-        for (i = 0;i <255;i++){
+        for (i = 0;i < MAX_USER;i++){
             uint32_t temp_ip = htonl(gts_args->netip + i +1);
             client_info_t *temp_client = NULL;
             HASH_FIND(hh2, ctx->ip_to_clients, &temp_ip, 4,temp_client);

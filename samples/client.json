@@ -1,13 +1,13 @@
 {
-    "server":"192.168.77.1",
+    "server":"116.204.7.19",
     "port":6666,
     "header key":"1234ABCE",
     "password":"12345678",
     "token":"ff593b9e6abeb2",
     "intf":"GTSc_tun",
     "mtu":1432,
-    "net":"10.7.0.2/24",
-    "encrypt":1,
+    "net":"10.8.0.2/24",
+    "encrypt":0,
     "shell_up":"/etc/GTS/client_up.sh",
     "shell_down":"/etc/GTS/client_down.sh",
     "logfile":"/var/log/GTS-client.log"

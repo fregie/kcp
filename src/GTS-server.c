@@ -21,15 +21,6 @@ clock_t end_time = 0;
 
 static char *shell_down = NULL;
 
-unsigned char* decrypt_header(unsigned char *buf, key_set* key_sets){
-    unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
-    start_time = clock();
-    process_message(buf, data_block, key_sets, DECRYPTION_MODE);
-    header_time = header_time + clock() - start_time;
-    data_block[8] = 0;
-    return data_block;
-}
-
 unsigned char* err_msg(uint8_t err_code){
     unsigned char* err_msg = malloc(2);
     err_msg[0] = ERR_FLAG;
@@ -38,8 +29,8 @@ unsigned char* err_msg(uint8_t err_code){
 }
 
 static void sig_handler(int signo) {
-    errf("\nselect time: %d\nheader time: %d\nhash time: %d\ncrypt time: %d",
-          select_time/1000, header_time/1000, hash_time/1000, crypt_time/1000);
+    errf("\nselect time: %d\nheader time: %d\nhash time: %d\ncrypt time: %d\nnat time: %d\nup time: %d\ndown time: %d",
+          select_time/1000, header_time/1000, hash_time/1000, crypt_time/1000, nat_time/1000, up_time/1000, down_time/1000);
     system(shell_down);
     unlink(IPC_FILE);
     exit(0);
@@ -82,8 +73,8 @@ int main(int argc, char **argv) {
     init_hash(hash_ctx, gts_args);
     
     /*init header_key*/
-    key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
-    generate_sub_keys(gts_args->header_key, key_sets);
+    DES_key_schedule ks;
+    DES_set_key_unchecked((const_DES_cblock*)gts_args->header_key, &ks);
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
     /*init UDP_sock and GTSs_tun*/
@@ -110,48 +101,49 @@ int main(int argc, char **argv) {
         bzero(gts_args->udp_buf, gts_args->mtu + GTS_HEADER_LEN);
         //recv data from client
         if (FD_ISSET(gts_args->UDP_sock, &readset)){
+            up_time -= clock();
             struct sockaddr_storage temp_remote_addr;
             socklen_t temp_remote_addrlen = sizeof(temp_remote_addr);
             length = recvfrom(gts_args->UDP_sock, gts_args->udp_buf,
                             gts_args->mtu + GTS_HEADER_LEN, 0,
                             (struct sockaddr *)&temp_remote_addr,
                             &temp_remote_addrlen);
-            //check version
-            
-            unsigned char* header = decrypt_header(gts_args->udp_buf, key_sets);
-            if (header[0] != 1){
+            //decrypt header
+            start_time = clock();
+            DES_ecb_encrypt((const_DES_cblock*)gts_args->udp_buf,
+                            (DES_cblock*)gts_args->udp_buf, &ks, DES_DECRYPT);
+            header_time += (clock() - start_time);
+            if (gts_args->udp_buf[0] != 1){
                 errf("version check failed,drop!");
                 unsigned char *msg = err_msg((uint8_t)HEADER_KEY_ERR);
                 sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
                 free(msg);
-                free(header);
                 continue;
             }
             client_info_t *client = NULL;
             
             start_time = clock();
-            HASH_FIND(hh1, hash_ctx->token_to_clients, header+VER_LEN, TOKEN_LEN, client);
+            HASH_FIND(hh1, hash_ctx->token_to_clients, gts_args->udp_buf+VER_LEN, TOKEN_LEN, client);
             if(client == NULL){
                 errf("unknow token, drop!");
                 unsigned char *msg = err_msg((uint8_t)TOKEN_ERR);
                 sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
                 free(msg);
-                free(header);
                 continue;
             }
-            free(header);
             //save source address
             client->tx += (length - GTS_HEADER_LEN);
             client->source_addr.addrlen = temp_remote_addrlen;
             memcpy(&client->source_addr.addr, &temp_remote_addr, temp_remote_addrlen);
             hash_time = hash_time + clock() - start_time;
             
-            start_time = clock();
+            
             if (gts_args->encrypt == 1){
                 if (0 !=crypto_set_password(client->password, strlen(client->password))) {
                     errf("can not find password");
                     continue;
                 }
+                start_time = clock();
                 if (-1 == crypto_decrypt(gts_args->tun_buf, gts_args->udp_buf,
                                         length - GTS_HEADER_LEN)){
                     errf("dropping invalid packet, maybe wrong password");
@@ -160,20 +152,26 @@ int main(int argc, char **argv) {
                     free(msg);
                     continue;
                 }
+                crypt_time = crypt_time + clock() - start_time;
+                start_time = clock();
                 if (-1 == nat_fix_upstream(client, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN)){
                     continue;
                 }
+                nat_time += (clock() - start_time);
                 write(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
             }else{
+                start_time = clock();
                 if (-1 == nat_fix_upstream(client, gts_args->udp_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN)){
                     continue;
                 }
+                nat_time += (clock() - start_time);
                 write(gts_args->tun, gts_args->udp_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
             }
-            crypt_time = crypt_time + clock() - start_time;
+            up_time += clock();
         }
         // recv data from tun
         if (FD_ISSET(gts_args->tun, &readset)){
+            down_time -= clock();
             length = read(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, gts_args->mtu);
             client_info_t *client;
             client = nat_fix_downstream(hash_ctx, gts_args->tun_buf+GTS_HEADER_LEN, length);
@@ -200,6 +198,7 @@ int main(int argc, char **argv) {
                     (struct sockaddr*)&client->source_addr.addr,
                     (socklen_t)client->source_addr.addrlen);
             }
+            down_time += clock();
         }
         if (FD_ISSET(gts_args->IPC_sock, &readset)){
                 char rx_buf[MAX_IPC_LEN];

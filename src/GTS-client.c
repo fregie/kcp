@@ -3,6 +3,19 @@
 
 #include <signal.h>
 
+//time debug ------------------------
+clock_t select_time = 0;
+clock_t up_time = 0;
+clock_t down_time = 0;
+clock_t header_time = 0;
+clock_t hash_time = 0;
+clock_t crypt_time = 0;
+clock_t nat_time = 0;
+
+clock_t start_time = 0;
+clock_t end_time = 0;
+//------------------------------------
+
 static char *shell_down = NULL;
 static uint8_t stat_code = STAT_OK;
     /*
@@ -14,27 +27,24 @@ static uint8_t stat_code = STAT_OK;
     */
 
 static void sig_handler(int signo) {
+    errf("\nup time: %d\ndown time: %d\ncrypt time: %d",
+         up_time/1000, down_time/1000, crypt_time/1000);
     system(shell_down);
     exit(0);
 }
 
-int check_header(char *token, unsigned char *buf, key_set* key_sets){
-    unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
-    process_message(buf, data_block, key_sets, DECRYPTION_MODE);
-    data_block[8] = 0;
+int check_header(char *token, unsigned char *buf, DES_key_schedule* ks){
+    DES_ecb_encrypt((const_DES_cblock*)buf, (DES_cblock*)buf, ks, DES_DECRYPT);
     // print_hex_memory(data_block, 8);
-    if (data_block[0] != 1){
+    if (buf[0] != 1){
         stat_code = HEADER_KEY_ERR;
         errf("version check failed");
-        free(data_block);
         return 1;
-    }else if(memcmp(token, data_block+1, TOKEN_LEN) != 0){
+    }else if(memcmp(token, buf+1, TOKEN_LEN) != 0){
         stat_code = TOKEN_ERR;
         errf("unknow token");
-        free(data_block);
         return 2;
     }else{
-        free(data_block);
         return 0;
     }
 }
@@ -95,9 +105,9 @@ int main(int argc, char **argv){
     sprintf(shell_down, "sh %s", gts_args->shell_down);
     set_env(gts_args); //set environment variable
     //make encrypted_header
-    key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
-    generate_sub_keys(gts_args->header_key, key_sets);
-    unsigned char* encrypted_header = encrypt_GTS_header(&gts_args->ver, gts_args->token[0], key_sets);
+    DES_key_schedule ks;
+    DES_set_key_unchecked((const_DES_cblock*)gts_args->header_key, &ks);
+    unsigned char* encrypted_header = encrypt_GTS_header(&gts_args->ver, gts_args->token[0], &ks);
     
     //init crypto
     if (0 != crypto_init()) {
@@ -138,6 +148,7 @@ int main(int argc, char **argv){
         // bzero(gts_args->tun_buf, gts_args->mtu + GTS_HEADER_LEN);
         //recv from server and write to tun
         if (FD_ISSET(gts_args->UDP_sock, &readset)){
+            down_time -= clock();
             length = recvfrom(gts_args->UDP_sock, gts_args->udp_buf,
                             gts_args->mtu + GTS_HEADER_LEN, 0,
                             (struct sockaddr*)&gts_args->remote_addr,
@@ -154,7 +165,7 @@ int main(int argc, char **argv){
                 continue;
             }
                             
-            if (check_header(gts_args->token[0], gts_args->udp_buf, key_sets) != 0){
+            if (check_header(gts_args->token[0], gts_args->udp_buf, &ks) != 0){
                 continue;
             }
             if(gts_args->encrypt == 1){
@@ -169,12 +180,16 @@ int main(int argc, char **argv){
                 write(gts_args->tun, gts_args->udp_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
             }
             stat_code = STAT_OK;
+            down_time += clock();
         }
         //read from tun and send to server
         if (FD_ISSET(gts_args->tun, &readset)){
+            up_time -= clock();
             length = read(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, gts_args->mtu);
             if (gts_args->encrypt == 1){
+                crypt_time -= clock();
                 crypto_encrypt(gts_args->udp_buf, gts_args->tun_buf, length);
+                crypt_time += clock();
                 memcpy(gts_args->udp_buf, encrypted_header, VER_LEN+TOKEN_LEN);
                 sendto(gts_args->UDP_sock, gts_args->udp_buf,
                     length + GTS_HEADER_LEN, 0,
@@ -182,11 +197,14 @@ int main(int argc, char **argv){
                     (socklen_t)sizeof(gts_args->server_addr));
             }else{
                 memcpy(gts_args->tun_buf, encrypted_header, VER_LEN+TOKEN_LEN);
+                crypt_time -= clock();
                 sendto(gts_args->UDP_sock, gts_args->tun_buf,
                     length + GTS_HEADER_LEN, 0,
                     (struct sockaddr*)&gts_args->server_addr,
                     (socklen_t)sizeof(gts_args->server_addr));
+                crypt_time += clock();
             }
+            up_time += clock();
         }
         //recv from unix domain socket 
         if (FD_ISSET(gts_args->IPC_sock, &readset)){

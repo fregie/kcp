@@ -22,10 +22,12 @@
 #include <netinet/in.h>
 #include <sys/select.h>
 #include <sodium.h>
+#include <openssl/des.h>
+
+#define MAX_USER 255
 
 #define GTS_VER 1
 #define IPC_FILE "/tmp/GTS.sock"
-#define MAX_USER 20
 #define TUN_MTU 1432  // 1492 (Ethernet) - 20 (IPv4, or 40 for IPv6) - 8 (UDP) - 32 (GTS header)
 #define GTS_HEADER_LEN 32
 #define VER_LEN 1

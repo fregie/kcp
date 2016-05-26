@@ -14,7 +14,7 @@ define Package/$(PKG_NAME)
   SECTION:=net
   CATEGORY:=Network
   TITLE:=GTS-client
-  DEPENDS:=+kmod-tun +ip +libsodium
+  DEPENDS:=+kmod-tun +ip +libsodium +libopenssl
 endef
 
 define Build/Prepare

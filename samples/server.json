@@ -6,8 +6,8 @@
     "token":["7e335d67f1dc2c","ff593b9e6abeb2","e3c7b8db40a961"],
     "intf":"GTSs_tun",
     "mtu":1432,
-    "net":"10.7.0.1/24",
-    "encrypt":1,
+    "net":"10.8.0.1/24",
+    "encrypt":0,
     "shell_up":"/etc/GTS/server_up.sh",
     "shell_down":"/etc/GTS/server_down.sh",
     "logfile":"/var/log/GTS-server.log"
