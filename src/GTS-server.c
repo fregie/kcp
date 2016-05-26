@@ -14,6 +14,7 @@ clock_t header_time = 0;
 clock_t hash_time = 0;
 clock_t crypt_time = 0;
 clock_t nat_time = 0;
+clock_t set_paswd_time = 0;
 
 clock_t start_time = 0;
 clock_t end_time = 0;
@@ -29,8 +30,8 @@ unsigned char* err_msg(uint8_t err_code){
 }
 
 static void sig_handler(int signo) {
-    errf("\nselect time: %d\nheader time: %d\nhash time: %d\ncrypt time: %d\nnat time: %d\nup time: %d\ndown time: %d",
-          select_time/1000, header_time/1000, hash_time/1000, crypt_time/1000, nat_time/1000, up_time/1000, down_time/1000);
+    errf("\nselect time: %d\nheader time: %d\nhash time: %d\ncrypt time: %d\npawd time: %d\nup time: %d\ndown time: %d",
+          select_time/1000, header_time/1000, hash_time/1000, crypt_time/1000, set_paswd_time/1000, up_time/1000, down_time/1000);
     system(shell_down);
     unlink(IPC_FILE);
     exit(0);
@@ -139,10 +140,12 @@ int main(int argc, char **argv) {
             
             
             if (gts_args->encrypt == 1){
+                set_paswd_time -= clock();
                 if (0 !=crypto_set_password(client->password, strlen(client->password))) {
                     errf("can not find password");
                     continue;
                 }
+                set_paswd_time += clock();
                 start_time = clock();
                 if (-1 == crypto_decrypt(gts_args->tun_buf, gts_args->udp_buf,
                                         length - GTS_HEADER_LEN)){

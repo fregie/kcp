@@ -1,4 +1,4 @@
-objects = action.o args.o des.o cJSON.o log.o crypto.o crypto_secretbox_salsa208poly1305.o hash.o decode.o
+objects = action.o args.o cJSON.o log.o crypto.o crypto_secretbox_salsa208poly1305.o hash.o decode.o
 
 GTS-server:GTS-client GTS-server.o nat.o $(objects)
 	$(CC) -o GTS-server GTS-server.o nat.o $(objects) -lm -lsodium -lssl -lcrypto -g
@@ -10,10 +10,8 @@ GTS-client.o:args.h action.h
 	$(CC) -c GTS-client.c -g
 action.o:args.h
 	$(CC) -c action.c -g
-args.o:args.h des.h cJSON.h log.h crypto.h b64.h
+args.o:args.h cJSON.h log.h crypto.h b64.h
 	$(CC) -c args.c -g
-des.o:des.h
-	$(CC) -c des.c -g
 cJSON.o:cJSON.h
 	$(CC) -c cJSON.c -g
 log.o:log.h

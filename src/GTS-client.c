@@ -49,16 +49,6 @@ int check_header(char *token, unsigned char *buf, DES_key_schedule* ks){
     }
 }
 
-unsigned char* header_key_parse(unsigned char *password, char *header_key){
-    unsigned char *decode_header_key = b64_decode(header_key, 8);
-    unsigned char* data_block = (unsigned char*) malloc(9*sizeof(char));
-    key_set* key_sets = (key_set*)malloc(17*sizeof(key_set));
-    generate_sub_keys(password, key_sets);
-    process_message(decode_header_key, data_block, key_sets, DECRYPTION_MODE);
-    data_block[8] = 0;
-    return data_block;
-}
-
 int main(int argc, char **argv){
     int ch;
     char *conf_file = NULL;
@@ -92,13 +82,6 @@ int main(int argc, char **argv){
     }
     if(init_log_file(gts_args->log_file) == -1){
         errf("init log_file failed!");
-    }
-    if (header_key != NULL){
-        if(gts_args->encrypt == 1){
-            gts_args->header_key = header_key_parse(gts_args->password[0], header_key);
-        }else{
-            errf("parameter -k need encrypt == 1 in config file");
-        }
     }
     free(header_key);
     shell_down = malloc(strlen(gts_args->shell_down)+ 8);

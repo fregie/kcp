@@ -2,7 +2,6 @@
 #define _ACTION_H_
 
 #include "args.h"
-#include "des.h"
 #include "hash.h"
 
 #include <signal.h>
