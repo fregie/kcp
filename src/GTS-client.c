@@ -3,6 +3,8 @@
 
 #include <signal.h>
 
+#define MAX_IPC_LEN 20
+
 //time debug ------------------------
 clock_t select_time = 0;
 clock_t up_time = 0;
@@ -18,6 +20,7 @@ clock_t end_time = 0;
 
 static char *shell_down = NULL;
 static uint8_t stat_code = STAT_OK;
+static unsigned char key[32];
     /*
     return client status:
     0..........status OK
@@ -35,8 +38,7 @@ static void sig_handler(int signo) {
 
 int check_header(char *token, unsigned char *buf, DES_key_schedule* ks){
     DES_ecb_encrypt((const_DES_cblock*)buf, (DES_cblock*)buf, ks, DES_DECRYPT);
-    // print_hex_memory(data_block, 8);
-    if (buf[0] != 1){
+    if (buf[0] != GTS_VER){
         stat_code = HEADER_KEY_ERR;
         errf("version check failed");
         return 1;
@@ -83,7 +85,6 @@ int main(int argc, char **argv){
     if(init_log_file(gts_args->log_file) == -1){
         errf("init log_file failed!");
     }
-    free(header_key);
     shell_down = malloc(strlen(gts_args->shell_down)+ 8);
     sprintf(shell_down, "sh %s", gts_args->shell_down);
     set_env(gts_args); //set environment variable
@@ -98,8 +99,9 @@ int main(int argc, char **argv){
         return EXIT_FAILURE;
     }
     if (gts_args->encrypt == 1){
-        if (0 !=crypto_set_password(gts_args->password[0], strlen(gts_args->password[0]))) {
-            errf("can not set password");
+        if (crypto_generichash(key, sizeof key, (unsigned char *)gts_args->password[0],
+                               strlen(gts_args->password[0]), NULL, 0) != 0){
+            errf("can't set password");
             return EXIT_FAILURE;
         }
     }
@@ -116,6 +118,7 @@ int main(int argc, char **argv){
         char *cmd = malloc(strlen(gts_args->shell_up) +8);
         sprintf(cmd, "sh %s", gts_args->shell_up);
         system(cmd);
+        free(cmd);
     }
     // init UDP_sock
     struct sockaddr_in server_addr;
@@ -136,6 +139,10 @@ int main(int argc, char **argv){
                             gts_args->mtu + GTS_HEADER_LEN, 0,
                             (struct sockaddr*)&gts_args->remote_addr,
                             (socklen_t*)&gts_args->remote_addr_len);
+            if (length == -1){
+                errf("recv from server failed");
+                continue;
+            }
             if (gts_args->udp_buf[0] == ERR_FLAG){
                 stat_code = gts_args->udp_buf[1];
                 if (stat_code == TOKEN_ERR){
@@ -153,14 +160,20 @@ int main(int argc, char **argv){
             }
             if(gts_args->encrypt == 1){
                 if (-1 == crypto_decrypt(gts_args->tun_buf, gts_args->udp_buf,
-                                        length - GTS_HEADER_LEN)){
+                                        length - GTS_HEADER_LEN, key)){
                     stat_code = PASSWORD_ERR;
                     errf("dropping invalid packet, maybe wrong password");
                     continue;
                 }
-                write(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
+                if (write(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
+                    errf("failed to write to tun");
+                    continue;
+                }
             }else{
-                write(gts_args->tun, gts_args->udp_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
+                if (write(gts_args->tun, gts_args->udp_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
+                    errf("failed to write to tun");
+                    continue;
+                }
             }
             stat_code = STAT_OK;
             down_time += clock();
@@ -169,22 +182,34 @@ int main(int argc, char **argv){
         if (FD_ISSET(gts_args->tun, &readset)){
             up_time -= clock();
             length = read(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, gts_args->mtu);
+            if (length == -1){
+                errf("read from tun failed");
+                continue;
+            }
             if (gts_args->encrypt == 1){
                 crypt_time -= clock();
-                crypto_encrypt(gts_args->udp_buf, gts_args->tun_buf, length);
+                crypto_encrypt(gts_args->udp_buf, gts_args->tun_buf, length, key);
                 crypt_time += clock();
                 memcpy(gts_args->udp_buf, encrypted_header, VER_LEN+TOKEN_LEN);
-                sendto(gts_args->UDP_sock, gts_args->udp_buf,
+                if (sendto(gts_args->UDP_sock, gts_args->udp_buf,
                     length + GTS_HEADER_LEN, 0,
                     (struct sockaddr*)&gts_args->server_addr,
-                    (socklen_t)sizeof(gts_args->server_addr));
+                    (socklen_t)sizeof(gts_args->server_addr)) == -1)
+                {
+                    errf("send to server failed");
+                    continue;
+                }
             }else{
                 memcpy(gts_args->tun_buf, encrypted_header, VER_LEN+TOKEN_LEN);
                 crypt_time -= clock();
-                sendto(gts_args->UDP_sock, gts_args->tun_buf,
+                if (sendto(gts_args->UDP_sock, gts_args->tun_buf,
                     length + GTS_HEADER_LEN, 0,
                     (struct sockaddr*)&gts_args->server_addr,
-                    (socklen_t)sizeof(gts_args->server_addr));
+                    (socklen_t)sizeof(gts_args->server_addr)) == -1)
+                    {
+                        errf("send to server failed");
+                        continue;
+                    }
                 crypt_time += clock();
             }
             up_time += clock();
@@ -194,9 +219,13 @@ int main(int argc, char **argv){
             char rx_buf[MAX_IPC_LEN];
             // bzero(rx_buf, MAX_IPC_LEN);
             struct sockaddr_un pmapi_addr;
-            int len = sizeof(pmapi_addr);
+            socklen_t len = sizeof(pmapi_addr);
             int recvSize = recvfrom(gts_args->IPC_sock, rx_buf, sizeof(rx_buf), 0,
                                    (struct sockaddr*)&pmapi_addr, (socklen_t *)&len);
+            if (recvSize == -1){
+                errf("recv from IPC socket failed");
+                continue;
+            }
             char *act;
             cJSON *json;
             json = cJSON_Parse(rx_buf);
@@ -204,19 +233,23 @@ int main(int argc, char **argv){
                 errf("request parse failed");
                 continue;
             }
-            act = strdup(cJSON_GetObjectItem(json,"act")->valuestring);
+            act = cJSON_GetObjectItem(json,"act")->valuestring;
             if (strcmp(act,"show_stat") == 0){
-                char *msg = malloc(20);
-                if (snprintf(msg, 20,"{\"stat\":%d}", stat_code) > 20){
+                char *msg = malloc(MAX_IPC_LEN);
+                if (snprintf(msg, MAX_IPC_LEN,"{\"stat\":%d}", stat_code) > MAX_IPC_LEN){
                     errf("msg too long");
                 } 
-                sendto(gts_args->IPC_sock, msg, strlen(msg),0, (struct sockaddr*)&pmapi_addr, len);
+                if (sendto(gts_args->IPC_sock, msg, strlen(msg),0, (struct sockaddr*)&pmapi_addr, len) == -1){
+                    errf("send to IPC socket failed");
+                    continue;
+                }
                 free(msg);
             }else{
                 
                 errf("unknow act");
                 continue;
             }
+            free(json);
         }
     }
     

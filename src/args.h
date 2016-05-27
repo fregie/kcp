@@ -33,7 +33,6 @@
 #define TOKEN_LEN 7
 #define NONCE_LEN 8
 #define AUTH_INFO_LEN 16
-#define MAX_IPC_LEN 200
 
 #define ERR_FLAG 78
 

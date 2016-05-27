@@ -3,6 +3,8 @@
 
 #define PID_BUF_SIZE 32
 
+#define max(a, b) (a)>(b)?(a):(b);
+
 static const char *help_message =
 "usage: GTS-server -c config_file\n"
 "       GTS-client -c config_file -k header_key\n"
@@ -103,9 +105,9 @@ int init_IPC_socket(){
     return pmmanager_fd;
 }
 
-int max(int a, int b) {
+/*int max(int a, int b) {
   return a > b ? a : b;
-}
+}*/
 
 fd_set init_select(gts_args_t *gts_args){
     fd_set readset;
@@ -157,7 +159,10 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             }
         }
         if (gts_args->encrypt == 1){
-            client->password = cJSON_GetObjectItem(json,"password")->valuestring;
+            char* password = cJSON_GetObjectItem(json,"password")->valuestring;
+            crypto_generichash(client->key, sizeof client->key, 
+                              (unsigned char *)password,
+                              strlen(password), NULL, 0);
         }
         DES_key_schedule ks;
         DES_set_key_unchecked((const_DES_cblock*)gts_args->header_key, &ks);

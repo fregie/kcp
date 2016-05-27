@@ -10,10 +10,10 @@ int crypto_set_password(const char *password,
                         unsigned long long password_len);
 
 int crypto_encrypt(unsigned char *c, unsigned char *m,
-                   unsigned long long mlen);
+                   unsigned long long mlen, unsigned char *key);
 
 int crypto_decrypt(unsigned char *m, unsigned char *c,
-                   unsigned long long clen);
+                   unsigned long long clen, unsigned char *key);
 
 #define SHADOWVPN_KEY_LEN 32
 
