@@ -2,6 +2,9 @@
 #include "action.h"
 
 #include <signal.h>
+#include <openssl/evp.h>
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
 
 #define MAX_IPC_LEN 20
 
@@ -30,13 +33,13 @@ static unsigned char key[32];
     */
 
 static void sig_handler(int signo) {
-    errf("\nup time: %d\ndown time: %d\ncrypt time: %d",
-         up_time/1000, down_time/1000, crypt_time/1000);
+    /*errf("\nup time: %d\ndown time: %d\ncrypt time: %d",
+         up_time/1000, down_time/1000, crypt_time/1000);*/
     system(shell_down);
     exit(0);
 }
 
-int check_header(char *token, unsigned char *buf, DES_key_schedule* ks){
+static int check_header(char *token, unsigned char *buf, DES_key_schedule* ks){
     DES_ecb_encrypt((const_DES_cblock*)buf, (DES_cblock*)buf, ks, DES_DECRYPT);
     if (buf[0] != GTS_VER){
         stat_code = HEADER_KEY_ERR;
@@ -50,6 +53,23 @@ int check_header(char *token, unsigned char *buf, DES_key_schedule* ks){
         return 0;
     }
 }
+
+static char * Base64Decode(char * input, int length){
+    BIO * b64 = NULL;
+    BIO * bmem = NULL;
+    char * buffer = (char *)malloc(length);
+    memset(buffer, 0, length);
+
+    b64 = BIO_new(BIO_f_base64());
+    bmem = BIO_new_mem_buf(input, length);
+    bmem = BIO_push(b64, bmem);
+    BIO_read(bmem, buffer, length);
+
+    BIO_free_all(bmem);
+
+    return buffer;
+}
+
 
 int main(int argc, char **argv){
     int ch;
@@ -82,6 +102,14 @@ int main(int argc, char **argv){
         printf("init client failed!");
         return EXIT_FAILURE;
     }
+    if (header_key != NULL){
+        header_key = Base64Decode(header_key, HEADER_KEY_LEN);
+        DES_key_schedule ks;
+        DES_set_key_unchecked((const_DES_cblock*)gts_args->password[0], &ks);
+        DES_ecb_encrypt((const_DES_cblock*)header_key,
+                        (DES_cblock*)gts_args->header_key, &ks, DES_DECRYPT);
+    }
+    
     if(init_log_file(gts_args->log_file) == -1){
         errf("init log_file failed!");
     }
@@ -126,15 +154,26 @@ int main(int argc, char **argv){
     gts_args->IPC_sock = init_IPC_socket();
     
     fd_set readset;
+    int max_fd;
     //start working!
     while (1){
-        readset = init_select(gts_args);    //select udp_socket and tun
+        max_fd = 0;
+        FD_ZERO(&readset);
+        FD_SET(gts_args->tun, &readset);
+        FD_SET(gts_args->UDP_sock, &readset);
+        FD_SET(gts_args->IPC_sock, &readset);
+        max_fd = max(gts_args->tun, max_fd);
+        max_fd = max(gts_args->UDP_sock, max_fd);
+        max_fd = max(gts_args->IPC_sock, max_fd);
+        if ( -1 == select(max_fd+1, &readset, NULL, NULL, NULL)){
+            errf("select failed");
+            return EXIT_FAILURE;
+        }
         
         // bzero(gts_args->udp_buf, gts_args->mtu + GTS_HEADER_LEN);
         // bzero(gts_args->tun_buf, gts_args->mtu + GTS_HEADER_LEN);
         //recv from server and write to tun
         if (FD_ISSET(gts_args->UDP_sock, &readset)){
-            down_time -= clock();
             length = recvfrom(gts_args->UDP_sock, gts_args->udp_buf,
                             gts_args->mtu + GTS_HEADER_LEN, 0,
                             (struct sockaddr*)&gts_args->remote_addr,
@@ -176,20 +215,16 @@ int main(int argc, char **argv){
                 }
             }
             stat_code = STAT_OK;
-            down_time += clock();
         }
         //read from tun and send to server
         if (FD_ISSET(gts_args->tun, &readset)){
-            up_time -= clock();
             length = read(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, gts_args->mtu);
             if (length == -1){
                 errf("read from tun failed");
                 continue;
             }
             if (gts_args->encrypt == 1){
-                crypt_time -= clock();
                 crypto_encrypt(gts_args->udp_buf, gts_args->tun_buf, length, key);
-                crypt_time += clock();
                 memcpy(gts_args->udp_buf, encrypted_header, VER_LEN+TOKEN_LEN);
                 if (sendto(gts_args->UDP_sock, gts_args->udp_buf,
                     length + GTS_HEADER_LEN, 0,
@@ -201,7 +236,6 @@ int main(int argc, char **argv){
                 }
             }else{
                 memcpy(gts_args->tun_buf, encrypted_header, VER_LEN+TOKEN_LEN);
-                crypt_time -= clock();
                 if (sendto(gts_args->UDP_sock, gts_args->tun_buf,
                     length + GTS_HEADER_LEN, 0,
                     (struct sockaddr*)&gts_args->server_addr,
@@ -210,9 +244,7 @@ int main(int argc, char **argv){
                         errf("send to server failed");
                         continue;
                     }
-                crypt_time += clock();
             }
-            up_time += clock();
         }
         //recv from unix domain socket 
         if (FD_ISSET(gts_args->IPC_sock, &readset)){

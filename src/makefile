@@ -1,4 +1,4 @@
-objects = action.o args.o cJSON.o log.o crypto.o crypto_secretbox_salsa208poly1305.o hash.o decode.o
+objects = action.o args.o cJSON.o log.o crypto.o crypto_secretbox_salsa208poly1305.o hash.o
 
 GTS-server:GTS-client GTS-server.o nat.o $(objects)
 	$(CC) -o GTS-server GTS-server.o nat.o $(objects) -lm -lsodium -lssl -lcrypto -g
@@ -10,7 +10,7 @@ GTS-client.o:args.h action.h
 	$(CC) -c GTS-client.c -g
 action.o:args.h
 	$(CC) -c action.c -g
-args.o:args.h cJSON.h log.h crypto.h b64.h
+args.o:args.h cJSON.h log.h crypto.h
 	$(CC) -c args.c -g
 cJSON.o:cJSON.h
 	$(CC) -c cJSON.c -g
@@ -24,8 +24,6 @@ hash.o:args.h hash.h
 	$(CC) -c hash.c -g
 nat.o:nat.h hash.h
 	$(CC) -c nat.c -g
-decode.o:b64.h
-	$(CC) -c decode.c -g
 clean:
 	rm GTS-client GTS-server GTS-client.o GTS-server.o nat.o $(objects)
 install:

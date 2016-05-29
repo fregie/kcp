@@ -22,6 +22,7 @@ clock_t end_time = 0;
 //------------------------------------
 
 static char *shell_down = NULL;
+static uint8_t err_no = STAT_OK;
 
 unsigned char* err_msg(uint8_t err_code){
     unsigned char* err_msg = malloc(2);
@@ -31,8 +32,8 @@ unsigned char* err_msg(uint8_t err_code){
 }
 
 static void sig_handler(int signo) {
-    errf("\nselect time: %d\nheader time: %d\nhash time: %d\ncrypt time: %d\npawd time: %d\nup time: %d\ndown time: %d",
-          select_time/1000, header_time/1000, hash_time/1000, crypt_time/1000, set_paswd_time/1000, up_time/1000, down_time/1000);
+    /*errf("\nselect time: %d\nheader time: %d\nhash time: %d\ncrypt time: %d\npawd time: %d\nup time: %d\ndown time: %d",
+          select_time/1000, header_time/1000, hash_time/1000, crypt_time/1000, set_paswd_time/1000, up_time/1000, down_time/1000);*/
     system(shell_down);
     unlink(IPC_FILE);
     exit(0);
@@ -81,6 +82,9 @@ int main(int argc, char **argv) {
     signal(SIGTERM, sig_handler);
     /*init UDP_sock and GTSs_tun*/
     gts_args->UDP_sock = init_UDP_socket(gts_args->server,gts_args->port);
+    if (gts_args->UDP_sock == -1){
+        return EXIT_FAILURE;
+    }
     gts_args->tun = tun_create(gts_args->intf);
     gts_args->IPC_sock = init_IPC_socket();
 
@@ -93,16 +97,25 @@ int main(int argc, char **argv) {
         system(cmd);
     }
     fd_set readset;
+    int max_fd;
     
     while (1){
-        select_time -= clock();
-        readset = init_select(gts_args);    //select udp_socket and tun
-        select_time += clock();
+        max_fd = 0;
+        FD_ZERO(&readset);
+        FD_SET(gts_args->tun, &readset);
+        FD_SET(gts_args->UDP_sock, &readset);
+        FD_SET(gts_args->IPC_sock, &readset);
+        max_fd = max(gts_args->tun, max_fd);
+        max_fd = max(gts_args->UDP_sock, max_fd);
+        max_fd = max(gts_args->IPC_sock, max_fd);
+        if ( -1 == select(max_fd+1, &readset, NULL, NULL, NULL)){
+            errf("select failed");
+            return EXIT_FAILURE;
+        }
         
         bzero(gts_args->udp_buf, gts_args->mtu + GTS_HEADER_LEN);
         //recv data from client
         if (FD_ISSET(gts_args->UDP_sock, &readset)){
-            up_time -= clock();
             struct sockaddr_storage temp_remote_addr;
             socklen_t temp_remote_addrlen = sizeof(temp_remote_addr);
             length = recvfrom(gts_args->UDP_sock, gts_args->udp_buf,
@@ -116,19 +129,24 @@ int main(int argc, char **argv) {
             DES_ecb_encrypt((const_DES_cblock*)gts_args->udp_buf,
                             (DES_cblock*)gts_args->udp_buf, &ks, DES_DECRYPT);
             if (gts_args->udp_buf[0] != GTS_VER){
-                errf("version check failed,drop!");
-                unsigned char *msg = err_msg((uint8_t)HEADER_KEY_ERR);
+                if (err_no != HEADER_KEY_ERR){
+                    errf("version check failed,drop!");
+                }
+                err_no = HEADER_KEY_ERR;
+                unsigned char *msg = err_msg(err_no);
                 sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
                 free(msg);
                 continue;
             }
             client_info_t *client = NULL;
             
-            hash_time -= clock();
             HASH_FIND(hh1, hash_ctx->token_to_clients, gts_args->udp_buf+VER_LEN, TOKEN_LEN, client);
             if(client == NULL){
-                errf("unknow token, drop!");
-                unsigned char *msg = err_msg((uint8_t)TOKEN_ERR);
+                if (err_no != TOKEN_ERR){
+                    errf("unknow token, drop!");
+                }
+                err_no = TOKEN_ERR;
+                unsigned char *msg = err_msg(err_no);
                 sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
                 free(msg);
                 continue;
@@ -137,20 +155,20 @@ int main(int argc, char **argv) {
             client->tx += (length - GTS_HEADER_LEN);
             client->source_addr.addrlen = temp_remote_addrlen;
             memcpy(&client->source_addr.addr, &temp_remote_addr, temp_remote_addrlen);
-            hash_time += clock();
             
             
             if (gts_args->encrypt == 1){
-                crypt_time -= clock();
                 if (-1 == crypto_decrypt(gts_args->tun_buf, gts_args->udp_buf,
                                         length - GTS_HEADER_LEN, client->key)){
-                    errf("dropping invalid packet, maybe wrong password");
-                    unsigned char *msg = err_msg(PASSWORD_ERR);
+                    if (err_no != PASSWORD_ERR){
+                        errf("dropping invalid packet, maybe wrong password");
+                    }
+                    err_no = PASSWORD_ERR;
+                    unsigned char *msg = err_msg(err_no);
                     sendto(gts_args->UDP_sock, msg, 2,0,(struct sockaddr*)&temp_remote_addr,temp_remote_addrlen);
                     free(msg);
                     continue;
                 }
-                crypt_time += clock();
                 if (-1 == nat_fix_upstream(client, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN)){
                     continue;
                 }
@@ -167,11 +185,9 @@ int main(int argc, char **argv) {
                     continue;
                 }
             }
-            up_time += clock();
         }
         // recv data from tun
         if (FD_ISSET(gts_args->tun, &readset)){
-            down_time -= clock();
             length = read(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, gts_args->mtu);
             if (length == -1){
                 errf("read from tun failed");
@@ -206,7 +222,6 @@ int main(int argc, char **argv) {
                    continue;
                }
             }
-            down_time += clock();
         }
         if (FD_ISSET(gts_args->IPC_sock, &readset)){
                 char rx_buf[MAX_IPC_LEN];

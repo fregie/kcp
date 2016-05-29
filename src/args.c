@@ -123,7 +123,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
                 char *value = token_json->valuestring;
                 int p = 0;
                 gts_args->token[i] = malloc(TOKEN_LEN);
-                while(*value && p < 7){
+                while(*value && p < TOKEN_LEN){
                     unsigned int temp;
                     int r = sscanf(value, "%2x", &temp);
                     if (r > 0){

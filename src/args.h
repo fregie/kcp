@@ -4,7 +4,6 @@
 #include "cJSON.h"
 #include "log.h"
 #include "crypto.h"
-#include "b64.h"
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -33,15 +32,10 @@
 #define TOKEN_LEN 7
 #define NONCE_LEN 8
 #define AUTH_INFO_LEN 16
+#define HEADER_KEY_LEN 8
 
 #define ERR_FLAG 78
 
-#define STAT_OK 0
-#define TOKEN_ERR 1
-#define PASSWORD_ERR 2
-#define HEADER_KEY_ERR 3
-
-#define ERR_FLAG 78
 #define STAT_OK 0
 #define TOKEN_ERR 1
 #define PASSWORD_ERR 2

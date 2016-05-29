@@ -3,13 +3,12 @@
 
 #define PID_BUF_SIZE 32
 
-#define max(a, b) (a)>(b)?(a):(b);
 
 static const char *help_message =
 "usage: GTS-server -c config_file\n"
 "       GTS-client -c config_file -k header_key\n"
 "header_key of client is not necessary(if not provide here, it must be provided in config_file)\n"
-"header_key here must be encryped by des then encode by base 64\n\n"
+"header_key here must be 8 Byte encryped by des then encode by base 64\n\n"
 "example:sudo GTS-server -c /etc/GTS/server.json\n"
 "        sudo GTS-client -c /etc/GTS/client.json\n"
 "GTS-----geewan transmit system\n\n";
@@ -55,11 +54,11 @@ int init_UDP_socket(char* server_address, uint16_t server_port){
     
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock == -1){
-        perror("Create socket failed:");
-        exit(1);
+        errf("Create socket failed:");
     }
     if (-1 == bind(sock, (struct sockaddr*)&addr, sizeof(addr))){
-        perror("Server bind failed:");
+        errf("Server bind failed:");
+        return -1;
     }
     
     return sock;
@@ -103,24 +102,6 @@ int init_IPC_socket(){
         errf("getsocket error.");
     }
     return pmmanager_fd;
-}
-
-/*int max(int a, int b) {
-  return a > b ? a : b;
-}*/
-
-fd_set init_select(gts_args_t *gts_args){
-    fd_set readset;
-    int max_fd = 0;
-    FD_ZERO(&readset);
-    FD_SET(gts_args->tun, &readset);
-    FD_SET(gts_args->UDP_sock, &readset);
-    FD_SET(gts_args->IPC_sock, &readset);
-    max_fd = max(gts_args->tun, max_fd);
-    max_fd = max(gts_args->UDP_sock, max_fd);
-    max_fd = max(gts_args->IPC_sock, max_fd);
-    select(max_fd+1, &readset, NULL, NULL, NULL);
-    return readset;
 }
 
 unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, DES_key_schedule* ks){
