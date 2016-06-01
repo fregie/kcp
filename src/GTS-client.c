@@ -24,13 +24,6 @@ clock_t end_time = 0;
 static char *shell_down = NULL;
 static uint8_t stat_code = STAT_OK;
 static unsigned char key[32];
-    /*
-    return client status:
-    0..........status OK
-    1..........wrong token
-    2..........wrong password
-    3..........wrong header_key
-    */
 
 static void sig_handler(int signo) {
     /*errf("\nup time: %d\ndown time: %d\ncrypt time: %d",
@@ -155,8 +148,14 @@ int main(int argc, char **argv){
     
     fd_set readset;
     int max_fd;
+    unsigned char *send_buf;
+    clock_t temp_time = clock() - BEAT_TIME;
     //start working!
     while (1){
+        if (clock() - temp_time >= BEAT_TIME){
+            temp_time += BEAT_TIME;
+            
+        }
         max_fd = 0;
         FD_ZERO(&readset);
         FD_SET(gts_args->tun, &readset);
@@ -170,8 +169,6 @@ int main(int argc, char **argv){
             return EXIT_FAILURE;
         }
         
-        // bzero(gts_args->udp_buf, gts_args->mtu + GTS_HEADER_LEN);
-        // bzero(gts_args->tun_buf, gts_args->mtu + GTS_HEADER_LEN);
         //recv from server and write to tun
         if (FD_ISSET(gts_args->UDP_sock, &readset)){
             length = recvfrom(gts_args->UDP_sock, gts_args->udp_buf,
@@ -179,21 +176,20 @@ int main(int argc, char **argv){
                             (struct sockaddr*)&gts_args->remote_addr,
                             (socklen_t*)&gts_args->remote_addr_len);
             if (length == -1){
-                errf("recv from server failed");
-                continue;
-            }
-            if (gts_args->udp_buf[0] == ERR_FLAG){
-                stat_code = gts_args->udp_buf[1];
-                if (stat_code == TOKEN_ERR){
-                    errf("token error");
-                }else if(stat_code == PASSWORD_ERR){
-                    errf("password error");
-                }else if(stat_code == HEADER_KEY_ERR){
-                    errf("header key error");
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // do nothing
+                } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+                            errno == EPERM || errno == EINTR) {
+                    // just log, do nothing
+                    err("recvfrom");
+                } else {
+                    err("recvfrom");
+                    break;
                 }
+            }
+            if (length == 0){
                 continue;
             }
-                            
             if (check_header(gts_args->token[0], gts_args->udp_buf, &ks) != 0){
                 continue;
             }
@@ -204,14 +200,25 @@ int main(int argc, char **argv){
                     errf("dropping invalid packet, maybe wrong password");
                     continue;
                 }
-                if (write(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
-                    errf("failed to write to tun");
+                send_buf = gts_args->tun_buf;
+            }else{
+                    if (-1 == crypto_decrypt(gts_args->udp_buf, gts_args->udp_buf,
+                                             ENCRYPT_LEN, key)){
+                    stat_code = PASSWORD_ERR;
+                    errf("dropping invalid packet, maybe wrong password");
                     continue;
                 }
-            }else{
-                if (write(gts_args->tun, gts_args->udp_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
-                    errf("failed to write to tun");
-                    continue;
+                send_buf = gts_args->udp_buf;
+            }
+            if (write(gts_args->tun, send_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // do nothing
+                } else if (errno == EPERM || errno == EINTR || errno == EINVAL) {
+                // just log, do nothing
+                err("write to tun");
+                } else {
+                err("write to tun");
+                break;
                 }
             }
             stat_code = STAT_OK;
@@ -220,31 +227,41 @@ int main(int argc, char **argv){
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, gts_args->mtu);
             if (length == -1){
-                errf("read from tun failed");
-                continue;
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // do nothing
+                } else if (errno == EPERM || errno == EINTR) {
+                // just log, do nothing
+                err("read from tun");
+                } else {
+                err("read from tun");
+                break;
+                }
             }
             if (gts_args->encrypt == 1){
                 crypto_encrypt(gts_args->udp_buf, gts_args->tun_buf, length, key);
-                memcpy(gts_args->udp_buf, encrypted_header, VER_LEN+TOKEN_LEN);
-                if (sendto(gts_args->UDP_sock, gts_args->udp_buf,
-                    length + GTS_HEADER_LEN, 0,
-                    (struct sockaddr*)&gts_args->server_addr,
-                    (socklen_t)sizeof(gts_args->server_addr)) == -1)
-                {
-                    errf("send to server failed");
-                    continue;
-                }
+                send_buf = gts_args->udp_buf;
             }else{
-                memcpy(gts_args->tun_buf, encrypted_header, VER_LEN+TOKEN_LEN);
-                if (sendto(gts_args->UDP_sock, gts_args->tun_buf,
-                    length + GTS_HEADER_LEN, 0,
-                    (struct sockaddr*)&gts_args->server_addr,
-                    (socklen_t)sizeof(gts_args->server_addr)) == -1)
-                    {
-                        errf("send to server failed");
-                        continue;
-                    }
+                crypto_encrypt(gts_args->tun_buf, gts_args->tun_buf, ENCRYPT_LEN, key);
+                send_buf = gts_args->tun_buf;
             }
+            memcpy(send_buf, encrypted_header, VER_LEN+TOKEN_LEN);
+            if (sendto(gts_args->UDP_sock, send_buf,
+                length + GTS_HEADER_LEN, 0,
+                (struct sockaddr*)&gts_args->server_addr,
+                (socklen_t)sizeof(gts_args->server_addr)) == -1)
+                {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        // do nothing
+                    } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+                                errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
+                        // just log, do nothing
+                        err("sendto");
+                    } else {
+                        err("sendto");
+                        // TODO rebuild socket
+                        break;
+                    }
+                }
         }
         //recv from unix domain socket 
         if (FD_ISSET(gts_args->IPC_sock, &readset)){
@@ -255,8 +272,16 @@ int main(int argc, char **argv){
             int recvSize = recvfrom(gts_args->IPC_sock, rx_buf, sizeof(rx_buf), 0,
                                    (struct sockaddr*)&pmapi_addr, (socklen_t *)&len);
             if (recvSize == -1){
-                errf("recv from IPC socket failed");
-                continue;
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // do nothing
+                } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+                            errno == EPERM || errno == EINTR) {
+                    // just log, do nothing
+                    err("recvfrom");
+                } else {
+                    err("recvfrom");
+                    break;
+                }
             }
             char *act;
             cJSON *json;
@@ -272,12 +297,20 @@ int main(int argc, char **argv){
                     errf("msg too long");
                 } 
                 if (sendto(gts_args->IPC_sock, msg, strlen(msg),0, (struct sockaddr*)&pmapi_addr, len) == -1){
-                    errf("send to IPC socket failed");
-                    continue;
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        // do nothing
+                    } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+                                errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
+                        // just log, do nothing
+                        err("sendto");
+                    } else {
+                        err("sendto");
+                        // TODO rebuild socket
+                        break;
+                    }
                 }
                 free(msg);
             }else{
-                
                 errf("unknow act");
                 continue;
             }

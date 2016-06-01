@@ -125,6 +125,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
     act = cJSON_GetObjectItem(json,"act")->valuestring;
     if (strcmp(act,"add_user") == 0){
         client_info_t *client = malloc(sizeof(client_info_t));
+        client_info_t *temp_client = NULL;
         bzero(client, sizeof(client_info_t));
         char *token = cJSON_GetObjectItem(json,"token")->valuestring;
         int p = 0;
@@ -138,6 +139,11 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             }else{
                 break;
             }
+        }
+        HASH_FIND(hh1, ctx->token_to_clients, client->token, TOKEN_LEN, temp_client);
+        if (temp_client != NULL){
+            errf("add user failed,token already exsist");
+            return -1;
         }
         if (gts_args->encrypt == 1){
             char* password = cJSON_GetObjectItem(json,"password")->valuestring;
@@ -153,7 +159,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         int i;
         for (i = 0;i < MAX_USER;i++){
             uint32_t temp_ip = htonl(gts_args->netip + i +1);
-            client_info_t *temp_client = NULL;
+            temp_client = NULL;
             HASH_FIND(hh2, ctx->ip_to_clients, &temp_ip, 4,temp_client);
             if(temp_client == NULL){
                 client->output_tun_ip = temp_ip;

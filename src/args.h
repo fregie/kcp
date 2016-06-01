@@ -33,6 +33,9 @@
 #define NONCE_LEN 8
 #define AUTH_INFO_LEN 16
 #define HEADER_KEY_LEN 8
+#define BEAT_TIME 10*1000000 //heart beat time (10s)
+
+#define ENCRYPT_LEN 16 //if not set encrypt, will encrypt 16 bytes for check password
 
 #define ERR_FLAG 78
 
@@ -78,7 +81,6 @@ typedef struct{
   uint32_t netip;
   
   char *log_file;
-  char *pid_file;
 } gts_args_t;
 
 int init_gts_args(gts_args_t *gts_args, char *conf_file);
