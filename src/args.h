@@ -29,20 +29,41 @@
 #define TUN_MTU 1432  // 1492 (Ethernet) - 20 (IPv4, or 40 for IPv6) - 8 (UDP) - 32 (GTS header)
 #define GTS_HEADER_LEN 32
 #define VER_LEN 1
-#define TOKEN_LEN 7
+#define FLAG_LEN 1
+#define TOKEN_LEN 6
 #define NONCE_LEN 8
 #define AUTH_INFO_LEN 16
 #define HEADER_KEY_LEN 8
-#define BEAT_TIME 10*1000000 //heart beat time (10s)
+#define BEAT_TIME 5 //heart beat time (10s)
 
-#define ENCRYPT_LEN 16 //if not set encrypt, will encrypt 16 bytes for check password
+#define ENCRYPT_LEN 16 //if not set encrypt, will encrypt 16 bytes for checking password
 
-#define ERR_FLAG 78
+#define FLAG_MSG 0
+#define FLAG_SYN 1
+#define FLAG_OK  2
+#define FLAG_HEADER_KEY_ERR 3
+#define FLAG_TOKEN_ERR 4
+#define FLAG_PASSWORD_ERR 5
 
-#define STAT_OK 0
-#define TOKEN_ERR 1
-#define PASSWORD_ERR 2
-#define HEADER_KEY_ERR 3
+/*               GTS_header 32bytes
+0        8        16                              63
++--------+--------+-------------------------------+
+|   ver  |  flag  |             token             |
++-------------------------------------------------+
+|                     nonce                       |
++-------------------------------------------------+
+|                   auth info                     |
+|                                                 |
++-------------------------------------------------+
+*/
+
+typedef struct{
+  uint8_t ver;
+  uint8_t flag;
+  char token[6];
+  char nonce[8];
+  char auth_info[16];
+} gts_header_t;
 
 typedef enum{
     GTS_MODE_SERVER = 1,
@@ -64,6 +85,7 @@ typedef struct{
   int UDP_sock;
   int IPC_sock;
   //declare buffers
+  unsigned char *recv_buf;
   unsigned char *tun_buf;
   unsigned char *udp_buf;
   //declare client_addr

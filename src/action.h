@@ -14,7 +14,7 @@ void print_help();
 int tun_create(const char *dev);
 int init_UDP_socket(char* server_address, uint16_t server_port);
 int init_IPC_socket();
-unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, DES_key_schedule* ks); //encrypt ver and token
+unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, uint8_t falg, DES_key_schedule* ks); //encrypt ver and token
 int api_request_parse(hash_ctx_t *ctx,char *data, gts_args_t *gts_args);
 char* generate_stat_info(hash_ctx_t *ctx);
 int init_log_file(char *filename);

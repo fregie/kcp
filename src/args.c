@@ -159,7 +159,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
                 return -1;
             }
             int p = 0;
-            while(*value && p < 7){
+            while(*value && p < TOKEN_LEN){
                     unsigned int temp;
                     int r = sscanf(value, "%2x", &temp);
                     if (r > 0){
@@ -194,6 +194,7 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
     }
     gts_args->ver = GTS_VER;
     
+    gts_args->recv_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
     gts_args->udp_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
     gts_args->tun_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
     

@@ -104,11 +104,12 @@ int init_IPC_socket(){
     return pmmanager_fd;
 }
 
-unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, DES_key_schedule* ks){
+unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, uint8_t flag, DES_key_schedule* ks){
     unsigned char* data_block = malloc(8*sizeof(char));
     unsigned char* encrypted_header = malloc(8*sizeof(char));
     memcpy(data_block, ver,VER_LEN);
-    memcpy(data_block + VER_LEN, token, TOKEN_LEN);
+    memset(data_block + VER_LEN, flag, FLAG_LEN);
+    memcpy(data_block + VER_LEN + FLAG_LEN, token, TOKEN_LEN);
     DES_ecb_encrypt((const_DES_cblock*)data_block, (DES_cblock*)encrypted_header, ks, DES_ENCRYPT);
     free(data_block);
     return (unsigned char*)encrypted_header;
@@ -153,7 +154,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         }
         DES_key_schedule ks;
         DES_set_key_unchecked((const_DES_cblock*)gts_args->header_key, &ks);
-        client->encrypted_header = encrypt_GTS_header(&gts_args->ver, client->token, &ks);
+        client->encrypted_header = encrypt_GTS_header(&gts_args->ver, client->token, FLAG_MSG, &ks);
         client->rx = 0;
         client->tx = 0;
         int i;

@@ -7,6 +7,7 @@
 #include <openssl/buffer.h>
 
 #define MAX_IPC_LEN 20
+#define RANDOM_MSG_LEN 32
 
 //time debug ------------------------
 clock_t select_time = 0;
@@ -22,8 +23,8 @@ clock_t end_time = 0;
 //------------------------------------
 
 static char *shell_down = NULL;
-static uint8_t stat_code = STAT_OK;
 static unsigned char key[32];
+static stat_code = FLAG_OK;
 
 static void sig_handler(int signo) {
     /*errf("\nup time: %d\ndown time: %d\ncrypt time: %d",
@@ -32,14 +33,12 @@ static void sig_handler(int signo) {
     exit(0);
 }
 
-static int check_header(char *token, unsigned char *buf, DES_key_schedule* ks){
+static int check_header(char *token, unsigned char* buf, DES_key_schedule* ks){
     DES_ecb_encrypt((const_DES_cblock*)buf, (DES_cblock*)buf, ks, DES_DECRYPT);
     if (buf[0] != GTS_VER){
-        stat_code = HEADER_KEY_ERR;
         errf("version check failed");
         return 1;
-    }else if(memcmp(token, buf+1, TOKEN_LEN) != 0){
-        stat_code = TOKEN_ERR;
+    }else if(memcmp(token, buf + VER_LEN + FLAG_LEN, TOKEN_LEN) != 0){
         errf("unknow token");
         return 2;
     }else{
@@ -112,8 +111,8 @@ int main(int argc, char **argv){
     //make encrypted_header
     DES_key_schedule ks;
     DES_set_key_unchecked((const_DES_cblock*)gts_args->header_key, &ks);
-    unsigned char* encrypted_header = encrypt_GTS_header(&gts_args->ver, gts_args->token[0], &ks);
-    
+    unsigned char *encrypted_header = encrypt_GTS_header(&gts_args->ver, gts_args->token[0], FLAG_MSG, &ks);
+    unsigned char *syn_header = encrypt_GTS_header(&gts_args->ver, gts_args->token[0], FLAG_SYN, &ks);
     //init crypto
     if (0 != crypto_init()) {
         errf("GTS_crypto_init failed");
@@ -145,18 +144,46 @@ int main(int argc, char **argv){
     struct sockaddr_in server_addr;
     gts_args->UDP_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); 
     gts_args->IPC_sock = init_IPC_socket();
-    
+    //for select
     fd_set readset;
     int max_fd;
-    unsigned char *send_buf;
-    clock_t temp_time = clock() - BEAT_TIME;
+    struct timeval timeout;
+    timeout.tv_sec = 2;
+    timeout.tv_usec = 0;
+    
+    gts_header_t *gts_header = gts_args->recv_buf;
+    int crypt_len;
+    time_t temp_time = time(NULL) - BEAT_TIME;
+    time_t last_recv_time = time(NULL);
     //start working!
     while (1){
-        if (clock() - temp_time >= BEAT_TIME){
+        if (time(NULL) - temp_time >= BEAT_TIME){
             temp_time += BEAT_TIME;
-            
+            randombytes_buf(gts_args->recv_buf + GTS_HEADER_LEN, RANDOM_MSG_LEN);
+            memcpy(gts_args->recv_buf, syn_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
+            crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, RANDOM_MSG_LEN, key);
+            if (sendto(gts_args->UDP_sock, gts_args->recv_buf,
+                RANDOM_MSG_LEN + GTS_HEADER_LEN, 0,
+                (struct sockaddr*)&gts_args->server_addr,
+                (socklen_t)sizeof(gts_args->server_addr)) == -1)
+            {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // do nothing
+                } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+                            errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
+                    // just log, do nothing
+                    err("sendto");
+                } else {
+                    err("sendto");
+                    // TODO rebuild socket
+                    break;
+                }
+            }
         }
         max_fd = 0;
+        struct timeval timeout;
+        timeout.tv_sec = BEAT_TIME;
+        timeout.tv_usec = 0;
         FD_ZERO(&readset);
         FD_SET(gts_args->tun, &readset);
         FD_SET(gts_args->UDP_sock, &readset);
@@ -164,14 +191,15 @@ int main(int argc, char **argv){
         max_fd = max(gts_args->tun, max_fd);
         max_fd = max(gts_args->UDP_sock, max_fd);
         max_fd = max(gts_args->IPC_sock, max_fd);
-        if ( -1 == select(max_fd+1, &readset, NULL, NULL, NULL)){
+        if ( -1 == select(max_fd+1, &readset, NULL, NULL, &timeout)){
             errf("select failed");
             return EXIT_FAILURE;
         }
         
         //recv from server and write to tun
         if (FD_ISSET(gts_args->UDP_sock, &readset)){
-            length = recvfrom(gts_args->UDP_sock, gts_args->udp_buf,
+            last_recv_time = time(NULL);
+            length = recvfrom(gts_args->UDP_sock, gts_args->recv_buf,
                             gts_args->mtu + GTS_HEADER_LEN, 0,
                             (struct sockaddr*)&gts_args->remote_addr,
                             (socklen_t*)&gts_args->remote_addr_len);
@@ -190,27 +218,27 @@ int main(int argc, char **argv){
             if (length == 0){
                 continue;
             }
-            if (check_header(gts_args->token[0], gts_args->udp_buf, &ks) != 0){
+            DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_DECRYPT);
+            if (gts_header->ver != GTS_VER){
                 continue;
             }
-            if(gts_args->encrypt == 1){
-                if (-1 == crypto_decrypt(gts_args->tun_buf, gts_args->udp_buf,
-                                        length - GTS_HEADER_LEN, key)){
-                    stat_code = PASSWORD_ERR;
-                    errf("dropping invalid packet, maybe wrong password");
-                    continue;
-                }
-                send_buf = gts_args->tun_buf;
-            }else{
-                    if (-1 == crypto_decrypt(gts_args->udp_buf, gts_args->udp_buf,
-                                             ENCRYPT_LEN, key)){
-                    stat_code = PASSWORD_ERR;
-                    errf("dropping invalid packet, maybe wrong password");
-                    continue;
-                }
-                send_buf = gts_args->udp_buf;
+            if (gts_header->flag != FLAG_MSG){
+                stat_code = gts_header->flag;
             }
-            if (write(gts_args->tun, send_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
+            if (memcmp(gts_args->token[0], gts_header->token, TOKEN_LEN) != 0){
+                errf("token err");
+                continue;
+            }
+            if(gts_args->encrypt == 1) 
+                crypt_len = length - GTS_HEADER_LEN;
+            else
+                crypt_len = ENCRYPT_LEN;
+            if (-1 == crypto_decrypt(gts_args->recv_buf, gts_args->recv_buf,
+                                        crypt_len, key)){
+                errf("dropping invalid packet, maybe wrong password");
+                continue;
+            }
+            if (write(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 // do nothing
                 } else if (errno == EPERM || errno == EINTR || errno == EINVAL) {
@@ -221,11 +249,13 @@ int main(int argc, char **argv){
                 break;
                 }
             }
-            stat_code = STAT_OK;
         }
         //read from tun and send to server
         if (FD_ISSET(gts_args->tun, &readset)){
-            length = read(gts_args->tun, gts_args->tun_buf+GTS_HEADER_LEN, gts_args->mtu);
+            length = read(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, gts_args->mtu);
+            if (stat_code != FLAG_OK || time(NULL) - last_recv_time >=3*BEAT_TIME ){
+                continue;
+            }
             if (length == -1){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 // do nothing
@@ -238,14 +268,13 @@ int main(int argc, char **argv){
                 }
             }
             if (gts_args->encrypt == 1){
-                crypto_encrypt(gts_args->udp_buf, gts_args->tun_buf, length, key);
-                send_buf = gts_args->udp_buf;
+                crypt_len = length;
             }else{
-                crypto_encrypt(gts_args->tun_buf, gts_args->tun_buf, ENCRYPT_LEN, key);
-                send_buf = gts_args->tun_buf;
+                crypt_len = ENCRYPT_LEN;
             }
-            memcpy(send_buf, encrypted_header, VER_LEN+TOKEN_LEN);
-            if (sendto(gts_args->UDP_sock, send_buf,
+            crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, crypt_len, key);
+            memcpy(gts_args->recv_buf, encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
+            if (sendto(gts_args->UDP_sock, gts_args->recv_buf,
                 length + GTS_HEADER_LEN, 0,
                 (struct sockaddr*)&gts_args->server_addr,
                 (socklen_t)sizeof(gts_args->server_addr)) == -1)
