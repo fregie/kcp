@@ -123,40 +123,100 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         errf("request parse failed");
         return -1;
     }
-    act = cJSON_GetObjectItem(json,"act")->valuestring;
+    if (cJSON_HasObjectItem(json,"act") == 1){
+        act = cJSON_GetObjectItem(json,"act")->valuestring;
+    }else{
+        errf("no act");
+        return -1;
+    }
     if (strcmp(act,"add_user") == 0){
         client_info_t *client = malloc(sizeof(client_info_t));
         client_info_t *temp_client = NULL;
         bzero(client, sizeof(client_info_t));
-        char *token = cJSON_GetObjectItem(json,"token")->valuestring;
-        int p = 0;
-        while (p < 7){
-            unsigned int temp;
-            int r = sscanf(token, "%2x", &temp);
-            if(r > 0){
-                client->token[p] = temp;
-                token += 2;
-                p++;
-            }else{
-                break;
+        if (cJSON_HasObjectItem(json,"token") == 1){
+            char *token = cJSON_GetObjectItem(json,"token")->valuestring;
+            int p = 0;
+            while (p < TOKEN_LEN){
+                unsigned int temp;
+                int r = sscanf(token, "%2x", &temp);
+                if(r > 0){
+                    client->token[p] = temp;
+                    token += 2;
+                    p++;
+                }else{
+                    break;
+                }
             }
+        }else{
+            errf("no token");
+            free(client);
+            return -1;
         }
         HASH_FIND(hh1, ctx->token_to_clients, client->token, TOKEN_LEN, temp_client);
         if (temp_client != NULL){
             errf("add user failed,token already exsist");
+            free(client);
             return -1;
         }
-        if (gts_args->encrypt == 1){
-            char* password = cJSON_GetObjectItem(json,"password")->valuestring;
-            crypto_generichash(client->key, sizeof client->key, 
-                              (unsigned char *)password,
-                              strlen(password), NULL, 0);
+        if (cJSON_HasObjectItem(json,"password") != 1){
+            errf("no password");
+            free(client);
+            return -1;
         }
+        char* password = cJSON_GetObjectItem(json,"password")->valuestring;
+        crypto_generichash(client->key, sizeof client->key, 
+                            (unsigned char *)password,
+                            strlen(password), NULL, 0);
         DES_key_schedule ks;
         DES_set_key_unchecked((const_DES_cblock*)gts_args->header_key, &ks);
         client->encrypted_header = encrypt_GTS_header(&gts_args->ver, client->token, FLAG_MSG, &ks);
         client->rx = 0;
         client->tx = 0;
+        client->over_data = 0;
+        if (cJSON_HasObjectItem(json,"txquota") == 1){
+            client->txquota = cJSON_GetObjectItem(json,"txquota")->valueint;
+            if (client->txquota == -1){
+                client->txquota = UNLIMIT;
+            }else{
+                client->txquota = client->txquota * 1024;
+            }
+        }else{
+            client->txquota = UNLIMIT;
+        }
+        if (cJSON_HasObjectItem(json,"expire") == 1){
+            char* data = cJSON_GetObjectItem(json,"expire")->valuestring;
+            client->expire = malloc(sizeof(struct tm));
+            char *p = strchr(data, '/');
+            *p = 0; 
+            p++;
+            client->expire->tm_year = atol(data);
+            data = p;
+            p = strchr(data, '/');
+            *p = 0;
+            p++;
+            client->expire->tm_mon = atol(data);
+            data = p;
+            p = strchr(data, ' ');
+            *p = 0;
+            p++;
+            client->expire->tm_mday = atol(data);
+            data = p;
+            p = strchr(data, ':');
+            *p = 0;
+            p++;
+            client->expire->tm_hour = atol(data);
+            data = p;
+            p = strchr(data, ':');
+            *p = 0;
+            p++;
+            client->expire->tm_min = atol(data);
+            data = p;
+            client->expire->tm_sec = atol(data);
+        }else{
+            client->expire->tm_year = 2100;
+            client->expire->tm_mon = 0;
+            client->expire->tm_mday = 1;
+        }
         int i;
         for (i = 0;i < MAX_USER;i++){
             uint32_t temp_ip = htonl(gts_args->netip + i +1);
@@ -169,6 +229,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         }
         if(client == NULL){
             errf("add user failed!,may be too many user");
+            free(client);
             return -1;
         }
         HASH_ADD(hh1, ctx->token_to_clients, token, TOKEN_LEN, client);
@@ -216,13 +277,14 @@ char* generate_stat_info(hash_ctx_t *ctx){
     for(client = ctx->token_to_clients; client != NULL; client=client->hh1.next){
         cJSON *user;
         cJSON_AddItemToArray(info, user = cJSON_CreateObject());
-        char *print_token = malloc(100);
-        sprintf(print_token, "%2x%2x%2x%2x%2x%2x%2x",(uint8_t)client->token[0],
+        char *print_token = malloc(TOKEN_LEN*2+1);
+        sprintf(print_token, "%2x%2x%2x%2x%2x%2x",(uint8_t)client->token[0],
                 (uint8_t)client->token[1], (uint8_t)client->token[2],(uint8_t)client->token[3],
-                (uint8_t)client->token[4], (uint8_t)client->token[5],(uint8_t)client->token[6]);
+                (uint8_t)client->token[4], (uint8_t)client->token[5]);
         cJSON_AddStringToObject(user, "token", print_token);
         cJSON_AddNumberToObject(user, "tx", client->tx);
         cJSON_AddNumberToObject(user, "rx", client->rx);
+        cJSON_AddNumberToObject(user, "txquota", client->txquota);
     }
     output = cJSON_Print(root);
     return output;

@@ -6,6 +6,7 @@
 #define MAX_IPC_LEN 200
 #define ACT_OK "{\"status\":\"ok\"}"
 #define ACT_FAILED "{\"status\":\"failed\"}"
+#define CHECK_TIME 3
 
 //time debug ------------------------
 clock_t select_time = 0;
@@ -29,6 +30,46 @@ static void sig_handler(int signo) {
     system(shell_down);
     unlink(IPC_FILE);
     exit(0);
+}
+
+static void check_date(hash_ctx_t *ctx){
+    struct tm *pre_time;
+    time_t t;
+    t = time(NULL);
+    pre_time = gmtime(&t);
+    client_info_t *client;
+    for(client = ctx->token_to_clients; client != NULL; client=client->hh1.next){
+        if (client->expire == NULL)
+            continue;
+        if (pre_time->tm_year + 1900 > client->expire->tm_year){
+            client->over_data = OVER_DATA;
+            continue;
+        }
+        if (pre_time->tm_year + 1900 < client->expire->tm_year)
+            continue;
+        if (pre_time->tm_mon + 1 > client->expire->tm_mon){
+            client->over_data = OVER_DATA;
+            continue;
+        }
+        if (pre_time->tm_mon + 1 < client->expire->tm_mon)
+            continue;
+        if (pre_time->tm_mday > client->expire->tm_mday){
+            client->over_data = OVER_DATA;
+            continue;
+        }
+        if (pre_time->tm_mday < client->expire->tm_mday)
+            continue;
+        if (pre_time->tm_hour > client->expire->tm_hour){
+            client->over_data = OVER_DATA;
+            continue;
+        }
+        if (pre_time->tm_hour < client->expire->tm_hour)
+            continue;
+        if (pre_time->tm_min > client->expire->tm_min){
+            client->over_data = OVER_DATA;
+            continue;
+        }
+    }
 }
 
 int main(int argc, char **argv) {
@@ -93,8 +134,12 @@ int main(int argc, char **argv) {
     int max_fd;
     int crypt_len;
     gts_header_t *gts_header = gts_args->recv_buf;
+    time_t last_check_data = time(NULL) - CHECK_TIME;
     
     while (1){
+        if (time(NULL) - last_check_data >= CHECK_TIME){
+            check_date(hash_ctx);
+        }
         max_fd = 0;
         FD_ZERO(&readset);
         FD_SET(gts_args->tun, &readset);
@@ -150,24 +195,64 @@ int main(int argc, char **argv) {
                                     (socklen_t)temp_remote_addrlen))
                     {
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            // do nothing
                         } else if (errno == ENETUNREACH || errno == ENETDOWN ||
                                     errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-                            // just log, do nothing
                             err("sendto");
                         } else {
                             err("sendto");
-                            // TODO rebuild socket
                             break;
                         }
                     }
                 // struct sockaddr_in* temp_addr = &temp_remote_addr;
                 // errf("unknow token from ip: %s", inet_ntoa(temp_addr->sin_addr));
-                continue;
                 }
+                continue;
             }
-            //save source address
+            if(client->txquota <= 0 && client->txquota > UNLIMIT){
+                if (gts_header->flag == FLAG_SYN){
+                    gts_header->flag = FLAG_OVER_TXQUOTA;
+                    DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_ENCRYPT);
+                    if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
+                                    length, 0, (struct sockaddr*)&temp_remote_addr,
+                                    (socklen_t)temp_remote_addrlen))
+                    {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+                                    errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
+                            err("sendto");
+                        } else {
+                            err("sendto");
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+            if (client->over_data == OVER_DATA){
+                if (gts_header->flag == FLAG_SYN){
+                    gts_header->flag = FLAG_OVER_DATA;
+                    DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_ENCRYPT);
+                    if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
+                                    length, 0, (struct sockaddr*)&temp_remote_addr,
+                                    (socklen_t)temp_remote_addrlen))
+                    {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+                                    errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
+                            err("sendto");
+                        } else {
+                            err("sendto");
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+            if (client->txquota > UNLIMIT){
+                client->txquota -= (length - GTS_HEADER_LEN);
+            }
             client->tx += (length - GTS_HEADER_LEN);
+            //save source address
             client->source_addr.addrlen = temp_remote_addrlen;
             memcpy(&client->source_addr.addr, &temp_remote_addr, temp_remote_addrlen);
             
@@ -256,6 +341,9 @@ int main(int argc, char **argv) {
             }
             crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, crypt_len, client->key);
             memcpy(gts_args->recv_buf, client->encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
+            if (client->txquota > UNLIMIT){
+                client->txquota -= length;
+            }
             client->rx += length;
             if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
                 length + GTS_HEADER_LEN, 0,

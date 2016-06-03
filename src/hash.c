@@ -23,6 +23,9 @@ int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args){
         client->output_tun_ip = htonl(gts_args->netip + i + 1);
         client->rx = 0;
         client->tx = 0;
+        client->txquota = UNLIMIT;
+        client->expire = NULL;
+        client->over_data = 0;
 
         struct in_addr in;
         in.s_addr = client->output_tun_ip;

@@ -49,6 +49,11 @@ int json_parse(gts_args_t *gts_args, char *filename){
     }else{
         gts_args->encrypt = 0;
     }
+    if (cJSON_HasObjectItem(json,"beat time") == 1){
+        gts_args->beat_time = cJSON_GetObjectItem(json,"beat time")->valueint;
+    }else{
+        gts_args->beat_time = 20;
+    }
     if (cJSON_HasObjectItem(json,"shell_up") == 1){
         gts_args->shell_up = cJSON_GetObjectItem(json,"shell_up")->valuestring;
         if (access(gts_args->shell_up, R_OK) == -1){

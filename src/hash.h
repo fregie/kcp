@@ -4,6 +4,9 @@
 #include "args.h"
 #include "uthash.h"
 
+#define UNLIMIT -10000
+#define OVER_DATA 1
+
 typedef struct {
   struct sockaddr_storage addr;
   socklen_t addrlen;
@@ -22,6 +25,9 @@ typedef struct {
   uint32_t output_tun_ip;
   int64_t rx;
   int64_t tx;
+  int64_t txquota;
+  struct tm *expire;
+  int over_data;
 
   UT_hash_handle hh1;
   UT_hash_handle hh2;

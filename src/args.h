@@ -21,6 +21,7 @@
 #include <sys/select.h>
 #include <sodium.h>
 #include <openssl/des.h>
+#include <time.h>
 
 #define MAX_USER 255
 
@@ -34,7 +35,6 @@
 #define NONCE_LEN 8
 #define AUTH_INFO_LEN 16
 #define HEADER_KEY_LEN 8
-#define BEAT_TIME 5 //heart beat time (10s)
 
 #define ENCRYPT_LEN 16 //if not set encrypt, will encrypt 16 bytes for checking password
 
@@ -44,6 +44,8 @@
 #define FLAG_HEADER_KEY_ERR 3
 #define FLAG_TOKEN_ERR 4
 #define FLAG_PASSWORD_ERR 5
+#define FLAG_OVER_TXQUOTA 6
+#define FLAG_OVER_DATA 7
 
 /*               GTS_header 32bytes
 0        8        16                              63
@@ -73,6 +75,7 @@ typedef enum{
 typedef struct{
   gts_mode mode;
   int encrypt;
+  int beat_time;
   uint16_t port;
   char *server;
   char **password;

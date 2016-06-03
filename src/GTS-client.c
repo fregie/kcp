@@ -153,12 +153,12 @@ int main(int argc, char **argv){
     
     gts_header_t *gts_header = gts_args->recv_buf;
     int crypt_len;
-    time_t temp_time = time(NULL) - BEAT_TIME;
+    time_t temp_time = time(NULL) - gts_args->beat_time;
     time_t last_recv_time = time(NULL);
     //start working!
     while (1){
-        if (time(NULL) - temp_time >= BEAT_TIME){
-            temp_time += BEAT_TIME;
+        if (time(NULL) - temp_time >= gts_args->beat_time){
+            temp_time += gts_args->beat_time;
             randombytes_buf(gts_args->recv_buf + GTS_HEADER_LEN, RANDOM_MSG_LEN);
             memcpy(gts_args->recv_buf, syn_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
             crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, RANDOM_MSG_LEN, key);
@@ -182,7 +182,7 @@ int main(int argc, char **argv){
         }
         max_fd = 0;
         struct timeval timeout;
-        timeout.tv_sec = BEAT_TIME;
+        timeout.tv_sec = gts_args->beat_time;
         timeout.tv_usec = 0;
         FD_ZERO(&readset);
         FD_SET(gts_args->tun, &readset);
@@ -253,7 +253,7 @@ int main(int argc, char **argv){
         //read from tun and send to server
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, gts_args->mtu);
-            if (stat_code != FLAG_OK || time(NULL) - last_recv_time >=3*BEAT_TIME ){
+            if (stat_code != FLAG_OK || time(NULL) - last_recv_time >=3*gts_args->beat_time ){
                 continue;
             }
             if (length == -1){
