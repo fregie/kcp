@@ -173,7 +173,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         client->encrypted_header = encrypt_GTS_header(&gts_args->ver, client->token, FLAG_MSG, &ks);
         client->rx = 0;
         client->tx = 0;
-        client->over_data = 0;
+        client->over_date = 0;
         if (cJSON_HasObjectItem(json,"txquota") == 1){
             client->txquota = cJSON_GetObjectItem(json,"txquota")->valueint;
             if (client->txquota == -1){

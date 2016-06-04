@@ -45,7 +45,7 @@
 #define FLAG_TOKEN_ERR 4
 #define FLAG_PASSWORD_ERR 5
 #define FLAG_OVER_TXQUOTA 6
-#define FLAG_OVER_DATA 7
+#define FLAG_OVER_DATE 7
 
 /*               GTS_header 32bytes
 0        8        16                              63
@@ -89,8 +89,6 @@ typedef struct{
   int IPC_sock;
   //declare buffers
   unsigned char *recv_buf;
-  unsigned char *tun_buf;
-  unsigned char *udp_buf;
   //declare client_addr
   struct sockaddr_in server_addr;
   struct sockaddr_in remote_addr;

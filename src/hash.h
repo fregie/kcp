@@ -5,7 +5,7 @@
 #include "uthash.h"
 
 #define UNLIMIT -10000
-#define OVER_DATA 1
+#define OVER_DATE 1
 
 typedef struct {
   struct sockaddr_storage addr;
@@ -27,7 +27,7 @@ typedef struct {
   int64_t tx;
   int64_t txquota;
   struct tm *expire;
-  int over_data;
+  int over_date;
 
   UT_hash_handle hh1;
   UT_hash_handle hh2;

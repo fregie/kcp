@@ -32,6 +32,27 @@ static void sig_handler(int signo) {
     exit(0);
 }
 
+static int send_flag_msg(uint8_t flag, gts_args_t *gts_args, DES_key_schedule ks,
+                        int length, struct sockaddr_storage temp_remote_addr,  
+                        socklen_t temp_remote_addrlen){
+    memset(gts_args->recv_buf + VER_LEN, flag, FLAG_LEN);
+    DES_ecb_encrypt((const_DES_cblock*)gts_args->recv_buf, (DES_cblock*)gts_args->recv_buf, &ks, DES_ENCRYPT);
+    if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
+                    length, 0, (struct sockaddr*)&temp_remote_addr,
+                    (socklen_t)temp_remote_addrlen))
+    {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+                    errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
+            err("sendto");
+        } else {
+            err("sendto");
+            return -1;
+        }
+    }
+    return 0;
+}
+
 static void check_date(hash_ctx_t *ctx){
     struct tm *pre_time;
     time_t t;
@@ -42,31 +63,31 @@ static void check_date(hash_ctx_t *ctx){
         if (client->expire == NULL)
             continue;
         if (pre_time->tm_year + 1900 > client->expire->tm_year){
-            client->over_data = OVER_DATA;
+            client->over_date = OVER_DATE;
             continue;
         }
         if (pre_time->tm_year + 1900 < client->expire->tm_year)
             continue;
         if (pre_time->tm_mon + 1 > client->expire->tm_mon){
-            client->over_data = OVER_DATA;
+            client->over_date = OVER_DATE;
             continue;
         }
         if (pre_time->tm_mon + 1 < client->expire->tm_mon)
             continue;
         if (pre_time->tm_mday > client->expire->tm_mday){
-            client->over_data = OVER_DATA;
+            client->over_date = OVER_DATE;
             continue;
         }
         if (pre_time->tm_mday < client->expire->tm_mday)
             continue;
         if (pre_time->tm_hour > client->expire->tm_hour){
-            client->over_data = OVER_DATA;
+            client->over_date = OVER_DATE;
             continue;
         }
         if (pre_time->tm_hour < client->expire->tm_hour)
             continue;
         if (pre_time->tm_min > client->expire->tm_min){
-            client->over_data = OVER_DATA;
+            client->over_date = OVER_DATE;
             continue;
         }
     }
@@ -188,62 +209,24 @@ int main(int argc, char **argv) {
             HASH_FIND(hh1, hash_ctx->token_to_clients, gts_header->token, TOKEN_LEN, client);
             if(client == NULL){
                 if (gts_header->flag == FLAG_SYN){
-                    gts_header->flag = FLAG_TOKEN_ERR;
-                    DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_ENCRYPT);
-                    if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
-                                    length, 0, (struct sockaddr*)&temp_remote_addr,
-                                    (socklen_t)temp_remote_addrlen))
-                    {
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-                                    errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-                            err("sendto");
-                        } else {
-                            err("sendto");
-                            break;
-                        }
+                    if (-1 == send_flag_msg(FLAG_TOKEN_ERR, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
+                        break;
                     }
-                // struct sockaddr_in* temp_addr = &temp_remote_addr;
-                // errf("unknow token from ip: %s", inet_ntoa(temp_addr->sin_addr));
                 }
                 continue;
             }
             if(client->txquota <= 0 && client->txquota > UNLIMIT){
                 if (gts_header->flag == FLAG_SYN){
-                    gts_header->flag = FLAG_OVER_TXQUOTA;
-                    DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_ENCRYPT);
-                    if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
-                                    length, 0, (struct sockaddr*)&temp_remote_addr,
-                                    (socklen_t)temp_remote_addrlen))
-                    {
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-                                    errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-                            err("sendto");
-                        } else {
-                            err("sendto");
-                            break;
-                        }
+                    if (-1 == send_flag_msg(FLAG_OVER_TXQUOTA, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
+                        break;
                     }
                 }
                 continue;
             }
-            if (client->over_data == OVER_DATA){
+            if (client->over_date == OVER_DATE){
                 if (gts_header->flag == FLAG_SYN){
-                    gts_header->flag = FLAG_OVER_DATA;
-                    DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_ENCRYPT);
-                    if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
-                                    length, 0, (struct sockaddr*)&temp_remote_addr,
-                                    (socklen_t)temp_remote_addrlen))
-                    {
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-                                    errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-                            err("sendto");
-                        } else {
-                            err("sendto");
-                            break;
-                        }
+                    if (-1 == send_flag_msg(FLAG_OVER_DATE, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
+                        break;
                     }
                 }
                 continue;
@@ -264,47 +247,15 @@ int main(int argc, char **argv) {
             if (-1 == crypto_decrypt(gts_args->recv_buf, gts_args->recv_buf,
                                     crypt_len, client->key)){
                 if (gts_header->flag == FLAG_SYN){
-                    gts_header->flag = FLAG_PASSWORD_ERR;
-                    DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_ENCRYPT);
-                    if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
-                                    length, 0, (struct sockaddr*)&temp_remote_addr,
-                                    (socklen_t)temp_remote_addrlen))
-                    {
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            // do nothing
-                        } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-                                    errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-                            // just log, do nothing
-                            err("sendto");
-                        } else {
-                            err("sendto");
-                            // TODO rebuild socket
-                            break;
-                        }
+                    if (-1 == send_flag_msg(FLAG_PASSWORD_ERR, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
+                        break;
                     }
-                    // struct sockaddr_in* temp_addr = &temp_remote_addr;
-                    // errf("wrong password from: %s", inet_ntoa(temp_addr->sin_addr));
                 }
                 continue;
             }
             if (gts_header->flag == FLAG_SYN){
-                gts_header->flag = FLAG_OK;
-                DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_ENCRYPT);
-                if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
-                                length, 0, (struct sockaddr*)&temp_remote_addr,
-                                (socklen_t)temp_remote_addrlen))
-                {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        // do nothing
-                    } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-                                errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-                        // just log, do nothing
-                        err("sendto");
-                    } else {
-                        err("sendto");
-                        // TODO rebuild socket
-                        break;
-                    }
+                if (-1 == send_flag_msg(FLAG_OK, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
+                    break;
                 }
             }
             if (-1 == nat_fix_upstream(client, gts_args->recv_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN)){
@@ -382,6 +333,7 @@ int main(int argc, char **argv) {
                 }
                 sendto(gts_args->IPC_sock, send_buf, strlen(send_buf),0, (struct sockaddr*)&pmapi_addr, len);
                 free(send_buf);
+                check_date(hash_ctx);
         }
     }
     close(gts_args->UDP_sock);
