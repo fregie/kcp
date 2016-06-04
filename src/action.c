@@ -2,6 +2,7 @@
 
 
 #define PID_BUF_SIZE 32
+#define DATA_LEN 20
 
 
 static const char *help_message =
@@ -213,9 +214,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             data = p;
             client->expire->tm_sec = atol(data);
         }else{
-            client->expire->tm_year = 2100;
-            client->expire->tm_mon = 0;
-            client->expire->tm_mday = 1;
+            client->expire = NULL;
         }
         int i;
         for (i = 0;i < MAX_USER;i++){
@@ -274,19 +273,33 @@ char* generate_stat_info(hash_ctx_t *ctx){
     cJSON_AddStringToObject(root, "status", "ok");
     cJSON_AddItemToObject(root, "stat", info = cJSON_CreateArray());
     client_info_t *client;
+    char *print_token = malloc(TOKEN_LEN*2+1);
+    char *print_data = malloc(DATA_LEN);
     for(client = ctx->token_to_clients; client != NULL; client=client->hh1.next){
         cJSON *user;
         cJSON_AddItemToArray(info, user = cJSON_CreateObject());
-        char *print_token = malloc(TOKEN_LEN*2+1);
         sprintf(print_token, "%2x%2x%2x%2x%2x%2x",(uint8_t)client->token[0],
                 (uint8_t)client->token[1], (uint8_t)client->token[2],(uint8_t)client->token[3],
                 (uint8_t)client->token[4], (uint8_t)client->token[5]);
         cJSON_AddStringToObject(user, "token", print_token);
+        if (client->txquota <= UNLIMIT){
+            cJSON_AddNumberToObject(user, "txquota", -1);
+        }else{
+            cJSON_AddNumberToObject(user, "txquota", client->txquota/1024);
+        }
+        if (client->expire != NULL){
+            sprintf(print_data, "%d/%d/%d %d:%d:%d", 
+                    client->expire->tm_year, client->expire->tm_mon,
+                    client->expire->tm_mday, client->expire->tm_hour, 
+                    client->expire->tm_min, client->expire->tm_sec);
+            cJSON_AddStringToObject(user, "expire", print_data);
+        }
         cJSON_AddNumberToObject(user, "tx", client->tx);
         cJSON_AddNumberToObject(user, "rx", client->rx);
-        cJSON_AddNumberToObject(user, "txquota", client->txquota);
     }
     output = cJSON_Print(root);
+    free(print_token);
+    free(print_data);
     return output;
 }
 

@@ -6,7 +6,7 @@
 #define MAX_IPC_LEN 200
 #define ACT_OK "{\"status\":\"ok\"}"
 #define ACT_FAILED "{\"status\":\"failed\"}"
-#define CHECK_TIME 3
+#define CHECK_TIME 300
 
 //time debug ------------------------
 clock_t select_time = 0;
