@@ -263,7 +263,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         errf("unknow act cmd");
         return -1;
     }
-    free(json);
+    cJSON_Delete(json);
 }
 
 char* generate_stat_info(hash_ctx_t *ctx){
@@ -298,6 +298,7 @@ char* generate_stat_info(hash_ctx_t *ctx){
         cJSON_AddNumberToObject(user, "rx", client->rx);
     }
     output = cJSON_Print(root);
+    cJSON_Delete(root);
     free(print_token);
     free(print_data);
     return output;
