@@ -201,7 +201,6 @@ int main(int argc, char **argv) {
             DES_ecb_encrypt((const_DES_cblock*)gts_args->recv_buf,
                             (DES_cblock*)gts_args->recv_buf, &ks, DES_DECRYPT);
             if (gts_header->ver != GTS_VER){
-                errf("version check failed,drop!");
                 continue;
             }
             client_info_t *client = NULL;

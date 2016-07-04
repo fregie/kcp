@@ -26,9 +26,6 @@ int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args){
         client->txquota = UNLIMIT;
         client->expire = NULL;
         client->over_date = 0;
-
-        struct in_addr in;
-        in.s_addr = client->output_tun_ip;
         
         // add to hash: ctx->token_to_clients[token] = client
         HASH_ADD(hh1, ctx->token_to_clients, token, TOKEN_LEN, client);

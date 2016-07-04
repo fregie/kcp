@@ -124,10 +124,11 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         errf("request parse failed");
         return -1;
     }
-    if (cJSON_HasObjectItem(json,"act") == 1){
+    if (cJSON_HasObjectItem(json,"act") == 1 && cJSON_GetObjectItem(json,"act")->type == cJSON_String){
         act = cJSON_GetObjectItem(json,"act")->valuestring;
     }else{
         errf("no act");
+        cJSON_Delete(json);
         return -1;
     }
     if (strcmp(act,"add_user") == 0){
@@ -151,17 +152,20 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         }else{
             errf("no token");
             free(client);
+            cJSON_Delete(json);
             return -1;
         }
         HASH_FIND(hh1, ctx->token_to_clients, client->token, TOKEN_LEN, temp_client);
         if (temp_client != NULL){
             errf("add user failed,token already exsist");
             free(client);
+            cJSON_Delete(json);
             return -1;
         }
         if (cJSON_HasObjectItem(json,"password") != 1){
             errf("no password");
             free(client);
+            cJSON_Delete(json);
             return -1;
         }
         char* password = cJSON_GetObjectItem(json,"password")->valuestring;
@@ -174,7 +178,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         client->rx = 0;
         client->tx = 0;
         client->over_date = 0;
-        if (cJSON_HasObjectItem(json,"txquota") == 1){
+        if (cJSON_HasObjectItem(json,"txquota") == 1 && cJSON_GetObjectItem(json,"txquota")->type == cJSON_Number){
             client->txquota = cJSON_GetObjectItem(json,"txquota")->valueint;
             if (client->txquota == -1){
                 client->txquota = UNLIMIT;
@@ -229,6 +233,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         if(client == NULL){
             errf("add user failed!,may be too many user");
             free(client);
+            cJSON_Delete(json);
             return -1;
         }
         HASH_ADD(hh1, ctx->token_to_clients, token, TOKEN_LEN, client);
@@ -249,7 +254,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
                 break;
             }
         }
-        client_info_t *client = malloc(sizeof(client_info_t));
+        client_info_t *client;
         HASH_FIND(hh1, ctx->token_to_clients, real_token, TOKEN_LEN, client);
         if(client == NULL){
             errf("can't find token from hash table");
@@ -257,6 +262,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         }
         HASH_DELETE(hh1,ctx->token_to_clients, client);
         HASH_DELETE(hh2,ctx->ip_to_clients, client);
+        free(client);
     }else if(strcmp(act,"show_stat") == 0){
         return 1;
     }else{
