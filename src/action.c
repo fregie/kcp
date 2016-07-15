@@ -238,6 +238,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         }
         HASH_ADD(hh1, ctx->token_to_clients, token, TOKEN_LEN, client);
         HASH_ADD(hh2, ctx->ip_to_clients, output_tun_ip, 4, client);
+        cJSON_Delete(json);
         return 0;
     }else if(strcmp(act,"del_user") == 0){
         char *token = cJSON_GetObjectItem(json,"token")->valuestring;
@@ -264,9 +265,11 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         HASH_DELETE(hh2,ctx->ip_to_clients, client);
         free(client);
     }else if(strcmp(act,"show_stat") == 0){
+        cJSON_Delete(json);
         return 1;
     }else{
         errf("unknow act cmd");
+        cJSON_Delete(json);
         return -1;
     }
     cJSON_Delete(json);
