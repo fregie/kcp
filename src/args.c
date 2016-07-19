@@ -23,25 +23,25 @@ int json_parse(gts_args_t *gts_args, char *filename){
         printf("Error before: [%s]\n",cJSON_GetErrorPtr());
         return -1;
     }
-    if (cJSON_HasObjectItem(json,"server") == 1){
+    if (cJSON_HasObjectItem(json,"server") == 1 && cJSON_GetObjectItem(json,"server")->type == cJSON_String){
         gts_args->server = cJSON_GetObjectItem(json,"server")->valuestring;
     }else{
         printf("can't find server ip in config file\n");
         return -1;
     }
-    if (cJSON_HasObjectItem(json,"port") == 1){
+    if (cJSON_HasObjectItem(json,"port") == 1 && cJSON_GetObjectItem(json,"port")->type == cJSON_Number){
         gts_args->port = cJSON_GetObjectItem(json,"port")->valueint;
     }else{
         printf("can't find port\n");
         return -1;
     }
-    if (cJSON_HasObjectItem(json,"header key") == 1){
+    if (cJSON_HasObjectItem(json,"header key") == 1 && cJSON_GetObjectItem(json,"header key")->type == cJSON_String){
         gts_args->header_key = cJSON_GetObjectItem(json,"header key")->valuestring;
     }else{
         printf("can't find header key\n");
         gts_args->header_key = strdup("fregieonly");
     }
-    if (cJSON_HasObjectItem(json,"encrypt") == 1){
+    if (cJSON_HasObjectItem(json,"encrypt") == 1 && cJSON_GetObjectItem(json,"encrypt")->type == cJSON_Number){
         gts_args->encrypt = cJSON_GetObjectItem(json,"encrypt")->valueint;
         if(gts_args->encrypt != 0){
             gts_args->encrypt = 1;
@@ -49,12 +49,12 @@ int json_parse(gts_args_t *gts_args, char *filename){
     }else{
         gts_args->encrypt = 0;
     }
-    if (cJSON_HasObjectItem(json,"beat time") == 1){
+    if (cJSON_HasObjectItem(json,"beat time") == 1 && cJSON_GetObjectItem(json,"beat time")->type == cJSON_Number){
         gts_args->beat_time = cJSON_GetObjectItem(json,"beat time")->valueint;
     }else{
         gts_args->beat_time = 20;
     }
-    if (cJSON_HasObjectItem(json,"shell_up") == 1){
+    if (cJSON_HasObjectItem(json,"shell_up") == 1  && cJSON_GetObjectItem(json,"shell_up")->type == cJSON_String){
         gts_args->shell_up = cJSON_GetObjectItem(json,"shell_up")->valuestring;
         if (access(gts_args->shell_up, R_OK) == -1){
             errf("GTS up script can't find");
@@ -64,7 +64,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
         printf("can't find up script");
         return -1;
     }
-    if (cJSON_HasObjectItem(json,"shell_down") == 1){
+    if (cJSON_HasObjectItem(json,"shell_down") == 1  && cJSON_GetObjectItem(json,"shell_down")->type == cJSON_String){
         gts_args->shell_down = cJSON_GetObjectItem(json,"shell_down")->valuestring;
         if (access(gts_args->shell_down, R_OK) == -1){
             errf("GTS down script can't find");
@@ -74,17 +74,17 @@ int json_parse(gts_args_t *gts_args, char *filename){
         printf("can't find down script");
         return -1;
     }
-    if (cJSON_HasObjectItem(json,"logfile") == 1){
+    if (cJSON_HasObjectItem(json,"logfile") == 1 && cJSON_GetObjectItem(json,"logfile")->type == cJSON_String){
         gts_args->log_file = cJSON_GetObjectItem(json,"logfile")->valuestring;
     }else{
         gts_args->log_file = strdup("/var/log/GTS-client.log");
     }
-    if (cJSON_HasObjectItem(json,"intf") == 1){
+    if (cJSON_HasObjectItem(json,"intf") == 1 && cJSON_GetObjectItem(json,"intf")->type == cJSON_String){
         gts_args->intf = cJSON_GetObjectItem(json,"intf")->valuestring;
     }else{
         gts_args->intf = strdup("GTS_tun");
     }
-    if (cJSON_HasObjectItem(json,"net") == 1){
+    if (cJSON_HasObjectItem(json,"net") == 1 && cJSON_GetObjectItem(json,"net")->type == cJSON_String){
         char *net = cJSON_GetObjectItem(json,"net")->valuestring;
         setenv("net", net, 1);
         char *p = strchr(net, '/');
@@ -96,13 +96,17 @@ int json_parse(gts_args_t *gts_args, char *filename){
         printf("can't find netip");
         return -1;
     }
-    if (cJSON_HasObjectItem(json,"mtu") == 1){
+    if (cJSON_HasObjectItem(json,"mtu") == 1 && cJSON_GetObjectItem(json,"mtu")->type == cJSON_Number){
         gts_args->mtu = cJSON_GetObjectItem(json,"mtu")->valueint;
     }else{
         gts_args->mtu = TUN_MTU;
     }
     if (cJSON_HasObjectItem(json,"token") == 1){
         if (gts_args->mode == GTS_MODE_SERVER){
+            if (cJSON_GetObjectItem(json,"token")->type != cJSON_Array || cJSON_GetObjectItem(json,"password")->type != cJSON_Array){
+                printf("token and password of server must be an array");
+                return -1;
+            }
             if (gts_args->encrypt == 1){
                 if (cJSON_GetArraySize(cJSON_GetObjectItem(json,"password")) != cJSON_GetArraySize(cJSON_GetObjectItem(json,"token"))){
                     printf("token numbers != password numbers\n");
@@ -143,6 +147,10 @@ int json_parse(gts_args_t *gts_args, char *filename){
                 token_json = token_json->next;
             }
         }else if(gts_args->mode == GTS_MODE_CLIENT){
+            if (cJSON_GetObjectItem(json,"token")->type != cJSON_String || cJSON_GetObjectItem(json,"password")->type != cJSON_String){
+                printf("token and password of client must string");
+                return -1;
+            }
             if (gts_args->encrypt == 1){
                 //init password
                 gts_args->password = malloc(sizeof(char*));
@@ -183,6 +191,10 @@ int json_parse(gts_args_t *gts_args, char *filename){
 }
 
 int init_gts_args(gts_args_t *gts_args,char *conf_file){
+    if (access(conf_file, F_OK) != 0){
+        printf("cant't find file %s \n", conf_file);
+        return -1;
+    }
     if (0 != json_parse(gts_args, conf_file)){
         return -1;
     }
