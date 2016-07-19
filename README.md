@@ -54,14 +54,14 @@ client.json:
     {
     "server":"0.0.0.0",                         # 服务端ip
     "port":6666,
-    "header_key":"1234ABCE",
+    "header key":"1234ABCE",
     "token":"b88d9ad8eabb",                     # 客户端使用的token
     "password":"geewantest",                    # token对应的密码
     "intf":"GTSc_tun",
     "mtu":1432,
     "net":"10.1.0.2/24",
     "encrypt":1,
-    "beat_time":5,                              # 向服务器发送心跳的间隔（秒）
+    "beat time":5,                              # 向服务器发送心跳的间隔（秒）
     "shell_up":"/etc/GTS/client_up.sh",
     "shell_down":"/etc/GTS/client_down.sh",
     "logfile":"/var/log/GTS-client.log"
