@@ -61,8 +61,15 @@ int json_parse(gts_args_t *gts_args, char *filename){
             return -1;
         }
     }else{
-        printf("can't find up script");
-        return -1;
+        if (gts_args->mode == GTS_MODE_CLIENT){
+            gts_args->shell_up = strdup("/etc/GTS/client_up.sh");
+        }else{
+            gts_args->shell_up = strdup("/etc/GTS/server_up.sh");
+        }
+        if (access(gts_args->shell_up, R_OK) == -1){
+            errf("GTS up script can't find");
+            return -1;
+        }
     }
     if (cJSON_HasObjectItem(json,"shell_down") == 1  && cJSON_GetObjectItem(json,"shell_down")->type == cJSON_String){
         gts_args->shell_down = cJSON_GetObjectItem(json,"shell_down")->valuestring;
@@ -71,8 +78,15 @@ int json_parse(gts_args_t *gts_args, char *filename){
             return -1;
         }
     }else{
-        printf("can't find down script");
-        return -1;
+        if (gts_args->mode == GTS_MODE_CLIENT){
+            gts_args->shell_down = strdup("/etc/GTS/client_down.sh");
+        }else{
+            gts_args->shell_down = strdup("/etc/GTS/server_down.sh");
+        }
+        if (access(gts_args->shell_down, R_OK) == -1){
+            errf("GTS down script can't find");
+            return -1;
+        }
     }
     if (cJSON_HasObjectItem(json,"logfile") == 1 && cJSON_GetObjectItem(json,"logfile")->type == cJSON_String){
         gts_args->log_file = cJSON_GetObjectItem(json,"logfile")->valuestring;
@@ -88,13 +102,27 @@ int json_parse(gts_args_t *gts_args, char *filename){
         char *net = cJSON_GetObjectItem(json,"net")->valuestring;
         setenv("net", net, 1);
         char *p = strchr(net, '/');
+        if (p == NULL){
+            errf("can't parse net'");
+            return -1;
+        }else{
+            *p = 0;
+        }
+        in_addr_t addr = inet_addr(net);
+        if (addr == INADDR_NONE){
+            errf("can't parse net");
+            return -1;
+        }
+        gts_args->netip = ntohl((uint32_t)addr);
+        free(net);
+    }else{
+        char *net = strdup("10.1.0.1/24");
+        setenv("net", net, 1);
+        char *p = strchr(net, '/');
         if (p) *p = 0;
         in_addr_t addr = inet_addr(net);
         gts_args->netip = ntohl((uint32_t)addr);
         free(net);
-    }else{
-        printf("can't find netip");
-        return -1;
     }
     if (cJSON_HasObjectItem(json,"mtu") == 1 && cJSON_GetObjectItem(json,"mtu")->type == cJSON_Number){
         gts_args->mtu = cJSON_GetObjectItem(json,"mtu")->valueint;
