@@ -222,11 +222,12 @@ int main(int argc, char **argv){
             if (gts_header->ver != GTS_VER){
                 continue;
             }
-            if (gts_header->flag != FLAG_MSG){
-                stat_code = gts_header->flag;
-            }
             if (memcmp(gts_args->token[0], gts_header->token, TOKEN_LEN) != 0){
                 errf("token err");
+                continue;
+            }
+            if (gts_header->flag != FLAG_MSG){
+                stat_code = gts_header->flag;
                 continue;
             }
             if(gts_args->encrypt == 1) 
