@@ -35,7 +35,7 @@ define Package/GTS/install
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/client_up.sh $(1)/etc/GTS/client_up.sh
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/client_down.sh $(1)/etc/GTS/client_down.sh
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/35-GTS $(1)/etc/hotplug.d/iface/35-GTS
-	$(INSTALL_BIN) ./files/GTS.init $(1)/etc/init.d/GTS
+	# $(INSTALL_BIN) ./files/GTS.init $(1)/etc/init.d/GTS
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/GTS-client $(1)/usr/bin
 endef
