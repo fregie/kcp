@@ -35,7 +35,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
         printf("can't find port\n");
         return -1;
     }
-    if (cJSON_HasObjectItem(json,"header key") == 1 && cJSON_GetObjectItem(json,"header key")->type == cJSON_String){
+    if (cJSON_HasObjectItem(json,"header key") == 1 && cJSON_GetObjectItem(json,"header_key")->type == cJSON_String){
         gts_args->header_key = cJSON_GetObjectItem(json,"header key")->valuestring;
     }else{
         printf("can't find header key\n");
@@ -49,7 +49,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
     }else{
         gts_args->encrypt = 0;
     }
-    if (cJSON_HasObjectItem(json,"beat time") == 1 && cJSON_GetObjectItem(json,"beat time")->type == cJSON_Number){
+    if (cJSON_HasObjectItem(json,"beat time") == 1 && cJSON_GetObjectItem(json,"beat_time")->type == cJSON_Number){
         gts_args->beat_time = cJSON_GetObjectItem(json,"beat time")->valueint;
     }else{
         gts_args->beat_time = 20;
