@@ -13,8 +13,14 @@ linux：
     # git source code and compile
     git clone https://username@github.com/geewan-rd/GTS.git
     cd GTS/ && git checkout develop
-    cd src/ && make 
+    mkdir build && cmake .. && make
     sudo make install
+
+    # if you wish to static link libsodium, run cmake with -DSODIUM_USE_STATIC_LIBRARY=ON
+    cmake .. -DSODIUM_USE_STATIC_LIBRARY=ON
+
+    # build with debug info, with -DDEBUG=ON, can combined with SODIUM_USE_STATIC_LIBRARY variable
+    cmake .. -DDEBUG=ON
 
 openWRT:  
 
@@ -144,4 +150,4 @@ client.json:
  4      | 未找到token      
  5      | 密码错误         
  6      | 超出流量限制      
- 7      | 超出日期限制      
+ 7      | 超出日期限制
