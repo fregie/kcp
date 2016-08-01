@@ -27,6 +27,11 @@
 *.i*86
 *.x86_64
 *.hex
+*.cmake
+CMakeFiles
+bin
+Makefile
+
 
 # Debug files
 *.dSYM/
@@ -34,3 +39,6 @@
 .vscode
 GTS-server
 GTS-client
+CMakeCache.txt
+CMakeLists.txt
+install_manifest.txt
