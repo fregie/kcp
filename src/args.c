@@ -116,7 +116,7 @@ int json_parse(gts_args_t *gts_args, char *filename){
         gts_args->netip = ntohl((uint32_t)addr);
         free(net);
     }else{
-        char *net = strdup("10.1.0.1/24");
+        char *net = strdup("10.1.0.2/24");
         setenv("net", net, 1);
         char *p = strchr(net, '/');
         if (p) *p = 0;
