@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
     int ch;
     char *conf_file = NULL;
     char *act = NULL;
-    while ((ch = getopt(argc, argv, "c:dv")) != -1){
+    while ((ch = getopt(argc, argv, "c:d:v")) != -1){
         switch (ch){
         case 'c':
             conf_file = strdup(optarg);
@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
             break;
         }
     }
-    if (argc == 1 || conf_file == NULL){
+    if (argc == 1 || conf_file == NULL || act == NULL){
         print_help();
         return EXIT_FAILURE;
     }
