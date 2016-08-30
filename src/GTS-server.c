@@ -127,11 +127,8 @@ int main(int argc, char **argv) {
     hash_ctx_t *hash_ctx;
     hash_ctx = malloc(sizeof(hash_ctx_t));
     int length; /*length of buffer recieved*/
-    printf("GTS-server start....\n");
+    printf("GTS-server starting....\n");
     init_gts_args(gts_args, conf_file);
-    if(init_log_file(gts_args->log_file) == -1){
-        errf("init log_file failed!");
-    }
     if(strcmp(act, "start") == 0){
         if (0 != daemon_start(gts_args)) {
         errf("can not start daemon");
@@ -146,6 +143,9 @@ int main(int argc, char **argv) {
         return 0;
     }
 
+    if(init_log_file(gts_args->log_file) == -1){
+        errf("init log_file failed!");
+    }
     shell_down = malloc(strlen(gts_args->shell_down)+ 8);
     sprintf(shell_down, "sh %s", gts_args->shell_down);
     set_env(gts_args);

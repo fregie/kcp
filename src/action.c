@@ -7,8 +7,8 @@
 
 static const char *help_message =
 "\n"
-"usage:     GTS-server -c config_file -d start/stop\n"
-"           GTS-client -c config_file -d start/stop -k header_key\n"
+"usage:     GTS-server -c config_file -d start/stop/restart\n"
+"           GTS-client -c config_file -d start/stop/restart -k header_key\n"
 "\n"
 "example:   sudo GTS-server -c /etc/GTS/server.json\n"
 "           sudo GTS-client -c /etc/GTS/client.json\n"

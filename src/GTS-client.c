@@ -98,13 +98,10 @@ int main(int argc, char **argv){
     bzero(gts_args, sizeof(gts_args_t));
     gts_args->mode = GTS_MODE_CLIENT;
     int length;
-    printf("GTS-client start.....\n");
+    printf("GTS-client starting.....\n");
     if (-1 == init_gts_args(gts_args, conf_file)){
         printf("init client failed!");
         return EXIT_FAILURE;
-    }
-    if(init_log_file(gts_args->log_file) == -1){
-        errf("init log_file failed!");
     }
 
     if(strcmp(act, "start") == 0){
@@ -120,8 +117,21 @@ int main(int argc, char **argv){
         }
         return 0;
     }
+    if(strcmp(act, "restart") == 0){
+        if (0 != daemon_stop(gts_args)) {
+        errf("can not start daemon");
+        return EXIT_FAILURE;
+        }
+        if (0 != daemon_start(gts_args)) {
+        errf("can not start daemon");
+        return EXIT_FAILURE;
+        }
+    }
 
 
+    if(init_log_file(gts_args->log_file) == -1){
+        errf("init log_file failed!");
+    }
     if (header_key != NULL){
         header_key = Base64Decode(header_key, HEADER_KEY_LEN);
         DES_key_schedule ks;
