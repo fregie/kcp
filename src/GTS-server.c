@@ -1,5 +1,6 @@
 #include "args.h"
 #include "action.h"
+#include "daemon.h"
 #include "hash.h"
 #include <signal.h>
 
@@ -96,11 +97,18 @@ static void check_date(hash_ctx_t *ctx){
 int main(int argc, char **argv) {
     int ch;
     char *conf_file = NULL;
-    while ((ch = getopt(argc, argv, "hc:")) != -1){
+    char *act = NULL;
+    while ((ch = getopt(argc, argv, "c:dv")) != -1){
         switch (ch){
         case 'c':
             conf_file = strdup(optarg);
             break;
+        case 'd':
+            act = strdup(optarg);
+            break;
+        case 'v':
+            printf("\nGTS-----------geewan transmit system\nversion: %s\n", GTS_RELEASE_VER);
+            return 0;
         default:
             print_help();
             break;
@@ -124,6 +132,20 @@ int main(int argc, char **argv) {
     if(init_log_file(gts_args->log_file) == -1){
         errf("init log_file failed!");
     }
+    if(strcmp(act, "start") == 0){
+        if (0 != daemon_start(gts_args)) {
+        errf("can not start daemon");
+        return EXIT_FAILURE;
+        }
+    }
+    if(strcmp(act, "stop") == 0){
+        if (0 != daemon_stop(gts_args)) {
+        errf("can not start daemon");
+        return EXIT_FAILURE;
+        }
+        return 0;
+    }
+
     shell_down = malloc(strlen(gts_args->shell_down)+ 8);
     sprintf(shell_down, "sh %s", gts_args->shell_down);
     set_env(gts_args);

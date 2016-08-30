@@ -1,5 +1,6 @@
 #include "args.h"
 #include "action.h"
+#include "daemon.h"
 
 #include <signal.h>
 #include <openssl/evp.h>
@@ -67,19 +68,27 @@ int main(int argc, char **argv){
     int ch;
     char *conf_file = NULL;
     char *header_key = NULL;
-    while ((ch = getopt(argc, argv, "hc:")) != -1){
+    char *act = NULL;
+    while ((ch = getopt(argc, argv, "c:kd:v")) != -1){
         switch (ch){
         case 'c':
             conf_file = strdup(optarg);
             break;
         case 'k':
             header_key = strdup(optarg);
+            break;
+        case 'd':
+            act = strdup(optarg);
+            break;
+        case 'v':
+            printf("\nGTS-----------geewan transmit system\nversion: %s\n", GTS_RELEASE_VER);
+            return 0;
         default:
             print_help();
             break;
         }
     }
-    if (argc == 1 || conf_file == NULL){
+    if (argc == 1 || conf_file == NULL || act == NULL){
         print_help();
         return EXIT_FAILURE;
     }
@@ -94,16 +103,31 @@ int main(int argc, char **argv){
         printf("init client failed!");
         return EXIT_FAILURE;
     }
+    if(init_log_file(gts_args->log_file) == -1){
+        errf("init log_file failed!");
+    }
+
+    if(strcmp(act, "start") == 0){
+        if (0 != daemon_start(gts_args)) {
+        errf("can not start daemon");
+        return EXIT_FAILURE;
+        }
+    }
+    if(strcmp(act, "stop") == 0){
+        if (0 != daemon_stop(gts_args)) {
+        errf("can not start daemon");
+        return EXIT_FAILURE;
+        }
+        return 0;
+    }
+
+
     if (header_key != NULL){
         header_key = Base64Decode(header_key, HEADER_KEY_LEN);
         DES_key_schedule ks;
         DES_set_key_unchecked((const_DES_cblock*)gts_args->password[0], &ks);
         DES_ecb_encrypt((const_DES_cblock*)header_key,
                         (DES_cblock*)gts_args->header_key, &ks, DES_DECRYPT);
-    }
-    
-    if(init_log_file(gts_args->log_file) == -1){
-        errf("init log_file failed!");
     }
     shell_down = malloc(strlen(gts_args->shell_down)+ 8);
     sprintf(shell_down, "sh %s", gts_args->shell_down);
@@ -228,6 +252,9 @@ int main(int argc, char **argv){
             }
             if (gts_header->flag != FLAG_MSG){
                 stat_code = gts_header->flag;
+                if (stat_code != FLAG_OK){
+                    errf("stat code : %d", stat_code);
+                }
                 continue;
             }
             if(gts_args->encrypt == 1) 

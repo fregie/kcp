@@ -11,5 +11,6 @@
     "beat_time":5,
     "shell_up":"/etc/GTS/client_up.sh",
     "shell_down":"/etc/GTS/client_down.sh",
-    "logfile":"/var/log/GTS-client.log"
+    "logfile":"/var/log/GTS-client.log",
+    "pidfile":"/var/run/gts.pid"
 }

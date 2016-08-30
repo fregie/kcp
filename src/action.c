@@ -6,12 +6,16 @@
 
 
 static const char *help_message =
-"usage: GTS-server -c config_file\n"
-"       GTS-client -c config_file -k header_key\n"
+"\n"
+"usage:     GTS-server -c config_file -d start/stop\n"
+"           GTS-client -c config_file -d start/stop -k header_key\n"
+"\n"
+"example:   sudo GTS-server -c /etc/GTS/server.json\n"
+"           sudo GTS-client -c /etc/GTS/client.json\n"
+"\n"
 "header_key of client is not necessary(if not provide here, it must be provided in config_file)\n"
 "header_key here must be 8 Byte encryped by des then encode by base 64\n\n"
-"example:sudo GTS-server -c /etc/GTS/server.json\n"
-"        sudo GTS-client -c /etc/GTS/client.json\n"
+"\n"
 "GTS-----geewan transmit system\n\n";
 
 void print_help(){

@@ -10,5 +10,6 @@
     "encrypt":0,
     "shell_up":"/etc/GTS/server_up.sh",
     "shell_down":"/etc/GTS/server_down.sh",
-    "logfile":"/var/log/GTS-server.log"
+    "logfile":"/var/log/GTS-server.log",
+    "pidfile":"/var/run/gts.pid"
 }

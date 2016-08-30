@@ -26,6 +26,8 @@
 #define MAX_USER 255
 
 #define GTS_VER 1
+#define GTS_RELEASE_VER "0.0.1"
+
 #define IPC_FILE "/tmp/GTS.sock"
 #define TUN_MTU 1432  // 1492 (Ethernet) - 20 (IPv4, or 40 for IPv6) - 8 (UDP) - 32 (GTS header)
 #define GTS_HEADER_LEN 32
@@ -104,6 +106,7 @@ typedef struct{
   uint32_t netip;
   
   char *log_file;
+  char *pid_file;
 } gts_args_t;
 
 int init_gts_args(gts_args_t *gts_args, char *conf_file);

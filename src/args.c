@@ -38,21 +38,27 @@ int json_parse(gts_args_t *gts_args, char *filename){
     if (cJSON_HasObjectItem(json,"header_key") == 1 && cJSON_GetObjectItem(json,"header_key")->type == cJSON_String){
         gts_args->header_key = cJSON_GetObjectItem(json,"header_key")->valuestring;
     }else{
-        printf("can't find header key\n");
+        printf("no header key mode\n");
         gts_args->header_key = strdup("fregieonly");
     }
     if (cJSON_HasObjectItem(json,"encrypt") == 1 && cJSON_GetObjectItem(json,"encrypt")->type == cJSON_Number){
         gts_args->encrypt = cJSON_GetObjectItem(json,"encrypt")->valueint;
         if(gts_args->encrypt != 0){
             gts_args->encrypt = 1;
+            printf("encrypt: yes\n");
+        }else{
+            printf("encrypt: no\n");
         }
     }else{
         gts_args->encrypt = 0;
+        printf("encrypt: no\n");
     }
     if (cJSON_HasObjectItem(json,"beat_time") == 1 && cJSON_GetObjectItem(json,"beat_time")->type == cJSON_Number){
         gts_args->beat_time = cJSON_GetObjectItem(json,"beat_time")->valueint;
+        printf("beat time: %ds\n", gts_args->beat_time);
     }else{
         gts_args->beat_time = 20;
+        printf("no beat time found,default beat time: 20s\n");
     }
     if (cJSON_HasObjectItem(json,"shell_up") == 1  && cJSON_GetObjectItem(json,"shell_up")->type == cJSON_String){
         gts_args->shell_up = cJSON_GetObjectItem(json,"shell_up")->valuestring;
@@ -92,6 +98,11 @@ int json_parse(gts_args_t *gts_args, char *filename){
         gts_args->log_file = cJSON_GetObjectItem(json,"logfile")->valuestring;
     }else{
         gts_args->log_file = strdup("/var/log/GTS-client.log");
+    }
+    if (cJSON_HasObjectItem(json,"pidfile") == 1 && cJSON_GetObjectItem(json,"pidfile")->type == cJSON_String){
+        gts_args->pid_file = cJSON_GetObjectItem(json,"pidfile")->valuestring;
+    }else{
+        gts_args->pid_file = strdup("/var/run/gts.pid");
     }
     if (cJSON_HasObjectItem(json,"intf") == 1 && cJSON_GetObjectItem(json,"intf")->type == cJSON_String){
         gts_args->intf = cJSON_GetObjectItem(json,"intf")->valuestring;
