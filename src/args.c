@@ -68,9 +68,9 @@ int json_parse(gts_args_t *gts_args, char *filename){
         }
     }else{
         if (gts_args->mode == GTS_MODE_CLIENT){
-            gts_args->shell_up = strdup("/etc/GTS/client_up.sh");
+            gts_args->shell_up = strdup("/etc/gts/client_up.sh");
         }else{
-            gts_args->shell_up = strdup("/etc/GTS/server_up.sh");
+            gts_args->shell_up = strdup("/etc/gts/server_up.sh");
         }
         if (access(gts_args->shell_up, R_OK) == -1){
             errf("GTS up script can't find");
@@ -85,9 +85,9 @@ int json_parse(gts_args_t *gts_args, char *filename){
         }
     }else{
         if (gts_args->mode == GTS_MODE_CLIENT){
-            gts_args->shell_down = strdup("/etc/GTS/client_down.sh");
+            gts_args->shell_down = strdup("/etc/gts/client_down.sh");
         }else{
-            gts_args->shell_down = strdup("/etc/GTS/server_down.sh");
+            gts_args->shell_down = strdup("/etc/gts/server_down.sh");
         }
         if (access(gts_args->shell_down, R_OK) == -1){
             errf("GTS down script can't find");
