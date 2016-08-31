@@ -29,11 +29,11 @@ define Package/GTS/description
   Geewan Transimit System
 endef
 
-define Package/GTS/install
+define Package/gts/install
 	$(INSTALL_DIR) $(1)/etc/GTS
-	$(INSTALL_CONF) $(PKG_BUILD_DIR)/samples/client.json $(1)/etc/GTS/client.json
-	$(INSTALL_CONF) $(PKG_BUILD_DIR)/samples/client_down.sh $(1)/etc/GTS/client_down.sh
-	$(INSTALL_CONF) $(PKG_BUILD_DIR)/samples/client_up.sh $(1)/etc/GTS/client_up.sh
+	$(INSTALL_CONF) $(PKG_BUILD_DIR)/samples/client.json $(1)/etc/gts/client.json
+	$(INSTALL_CONF) $(PKG_BUILD_DIR)/samples/client_down.sh $(1)/etc/gts/client_down.sh
+	$(INSTALL_CONF) $(PKG_BUILD_DIR)/samples/client_up.sh $(1)/etc/gts/client_up.sh
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/gts-cli $(1)/usr/bin
 endef
