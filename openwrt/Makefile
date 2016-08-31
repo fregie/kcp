@@ -4,12 +4,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=GTS
-PKG_VERSION:=1.0
+PKG_VERSION:=0.0.1
 
 PKG_SOURCE_PROTO=git
-PKG_SOURCE_URL:=https://fregie:fregie789632145@github.com/geewan-rd/GTS.git
+PKG_SOURCE_URL:=https://github.com/geewan-rd/GTS.git
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
-PKG_SOURCE_VERSION:=c8b5d2512fd8087874a112b9a77dad837f3736df
+PKG_SOURCE_VERSION:=6631ceae5be18cd2850bfbaa45798993efc4e797
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
@@ -35,7 +35,7 @@ define Package/GTS/install
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/samples/client_down.sh $(1)/etc/GTS/client_down.sh
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/samples/client_up.sh $(1)/etc/GTS/client_up.sh
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/GTS-client $(1)/usr/bin
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/gts-cli $(1)/usr/bin
 endef
 
 $(eval $(call BuildPackage,GTS))
