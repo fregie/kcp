@@ -1,6 +1,6 @@
 SET( CMAKE_BUILD_TYPE Debug )
 
-SET(COMMON_SOURCES action.c crypto.c crypto_secretbox_salsa208poly1305.c hash.c daemon.c cJSON.c log.c args.c)
+SET(COMMON_SOURCES action.c crypto.c crypto_secretbox_salsa208poly1305.c hash.c daemon.c cJSON.c log.c args.c ikcp.c)
 SET(GTS_SERVER_SOURCES ${COMMON_SOURCES} nat.c GTS-server.c)
 SET(GTS_CLIENT_SOURCES ${COMMON_SOURCES} GTS-client.c)
 

@@ -9,8 +9,8 @@
     "net":"10.1.0.2/24",
     "encrypt":0,
     "beat_time":5,
-    "shell_up":"/etc/GTS/client_up.sh",
-    "shell_down":"/etc/GTS/client_down.sh",
+    "shell_up":"/etc/gts/client_up.sh",
+    "shell_down":"/etc/gts/client_down.sh",
     "logfile":"/var/log/GTS-client.log",
     "pidfile":"/var/run/gts.pid"
 }

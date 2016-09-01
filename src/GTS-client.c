@@ -1,11 +1,13 @@
 #include "args.h"
 #include "action.h"
 #include "daemon.h"
+#include "ikcp.h"
 
 #include <signal.h>
 #include <openssl/evp.h>
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
+#include <sys/time.h>
 
 #define MAX_IPC_LEN 20
 #define RANDOM_MSG_LEN 32
@@ -25,7 +27,10 @@ clock_t end_time = 0;
 
 static char *shell_down = NULL;
 static unsigned char key[32];
-static stat_code = FLAG_OK;
+static int stat_code = FLAG_OK;
+
+static int UDP_socket;
+static struct sockaddr_in server_addr;
 
 static void sig_handler(int signo) {
     /*errf("\nup time: %d\ndown time: %d\ncrypt time: %d",
@@ -63,6 +68,23 @@ static char * Base64Decode(char * input, int length){
     return buffer;
 }
 
+static int udp_output(const char *buf, int len, ikcpcb *kcp, void *user){
+    if (sendto(UDP_socket, buf, len, 0,(struct sockaddr*)&server_addr,
+              (socklen_t)sizeof(server_addr)) == -1)
+        {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // do nothing
+            } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+                        errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
+                // just log, do nothing
+                err("sendto");
+            } else {
+                err("sendto");
+                return -1;
+            }
+        }
+        return 0;
+}
 
 int main(int argc, char **argv){
     int ch;
@@ -175,9 +197,21 @@ int main(int argc, char **argv){
         free(cmd);
     }
     // init UDP_sock
-    struct sockaddr_in server_addr;
     gts_args->UDP_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP); 
     gts_args->IPC_sock = init_IPC_socket();
+    UDP_socket = gts_args->UDP_sock;
+    server_addr = gts_args->server_addr;
+
+    // for kcp
+    struct timeval curr_time;
+    gettimeofday(&curr_time, NULL);
+    ikcpcb *kcp = ikcp_create(0x11223344, (void*)0);
+    kcp->output = udp_output;
+    ikcp_wndsize(kcp, 128, 128);
+    ikcp_nodelay(kcp, 1, 10, 2, 1);
+    kcp->rx_minrto = 10;
+    kcp->fastresend = 1;
+
     //for select
     fd_set readset;
     int max_fd;
@@ -214,6 +248,10 @@ int main(int argc, char **argv){
                 }
             }
         }
+        //update timestamp
+        gettimeofday(&curr_time, NULL);
+        ikcp_update(kcp, (IUINT32)curr_time.tv_usec);
+
         max_fd = 0;
         struct timeval timeout;
         timeout.tv_sec = gts_args->beat_time;
@@ -252,6 +290,10 @@ int main(int argc, char **argv){
             if (length == 0){
                 continue;
             }
+
+            ikcp_input(kcp, gts_args->recv_buf, length);
+            length = ikcp_recv(kcp, gts_args->recv_buf, gts_args->mtu + GTS_HEADER_LEN);
+
             DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_DECRYPT);
             if (gts_header->ver != GTS_VER){
                 continue;
@@ -312,23 +354,26 @@ int main(int argc, char **argv){
             }
             crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, crypt_len, key);
             memcpy(gts_args->recv_buf, encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
-            if (sendto(gts_args->UDP_sock, gts_args->recv_buf,
-                length + GTS_HEADER_LEN, 0,
-                (struct sockaddr*)&gts_args->server_addr,
-                (socklen_t)sizeof(gts_args->server_addr)) == -1)
-                {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        // do nothing
-                    } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-                                errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-                        // just log, do nothing
-                        err("sendto");
-                    } else {
-                        err("sendto");
-                        // TODO rebuild socket
-                        break;
-                    }
-                }
+
+            ikcp_send(kcp, gts_args->recv_buf, length + GTS_HEADER_LEN);            
+
+            // if (sendto(gts_args->UDP_sock, gts_args->recv_buf,
+            //     length + GTS_HEADER_LEN, 0,
+            //     (struct sockaddr*)&gts_args->server_addr,
+            //     (socklen_t)sizeof(gts_args->server_addr)) == -1)
+            //     {
+            //         if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            //             // do nothing
+            //         } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+            //                     errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
+            //             // just log, do nothing
+            //             err("sendto");
+            //         } else {
+            //             err("sendto");
+            //             // TODO rebuild socket
+            //             break;
+            //         }
+            //     }
         }
         //recv from unix domain socket 
         if (FD_ISSET(gts_args->IPC_sock, &readset)){
