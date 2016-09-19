@@ -4,7 +4,7 @@ GTS(Geewan Transimit System) provides an new way to transmit you data securely a
 linux：  
 
     # install openssl
-    yum install openssl
+    yum install openssl-devel
 
     # install libsodium
     wget https://github.com/jedisct1/libsodium/releases/download/1.0.10/libsodium-1.0.10.tar.gz
