@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
             break;
         }
     }
-    if (argc == 1 || conf_file == NULL || act == NULL){
+    if (argc == 1 || conf_file == NULL){
         print_help();
         return EXIT_FAILURE;
     }
@@ -141,6 +141,16 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
         }
         return 0;
+    }
+    if(strcmp(act, "restart") == 0){
+        if (0 != daemon_stop(gts_args)) {
+        errf("can not start daemon");
+        return EXIT_FAILURE;
+        }
+        if (0 != daemon_start(gts_args)) {
+        errf("can not start daemon");
+        return EXIT_FAILURE;
+        }
     }
 
     if(init_log_file(gts_args->log_file) == -1){

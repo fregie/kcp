@@ -88,7 +88,7 @@ int main(int argc, char **argv){
             break;
         }
     }
-    if (argc == 1 || conf_file == NULL || act == NULL){
+    if (argc == 1 || conf_file == NULL){
         print_help();
         return EXIT_FAILURE;
     }
