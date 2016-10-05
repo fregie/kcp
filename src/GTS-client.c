@@ -68,7 +68,7 @@ int main(int argc, char **argv){
     int ch;
     char *conf_file = NULL;
     char *header_key = NULL;
-    char *act = NULL;
+    char *act = "none";
     while ((ch = getopt(argc, argv, "c:kd:v")) != -1){
         switch (ch){
         case 'c':

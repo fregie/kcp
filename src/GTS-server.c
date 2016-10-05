@@ -97,7 +97,7 @@ static void check_date(hash_ctx_t *ctx){
 int main(int argc, char **argv) {
     int ch;
     char *conf_file = NULL;
-    char *act = NULL;
+    char *act = "none";
     while ((ch = getopt(argc, argv, "c:d:v")) != -1){
         switch (ch){
         case 'c':

@@ -7,10 +7,10 @@
 
 static const char *help_message =
 "\n"
-"usage:     GTS-server -c config_file -d start/stop/restart\n"
-"           GTS-client -c config_file -d start/stop/restart -k header_key\n"
+"usage:     GTS-server -c config_file [-d start/stop/restart]\n"
+"           GTS-client -c config_file [-d start/stop/restart] [-k header_key]\n"
 "\n"
-"example:   sudo GTS-server -c /etc/GTS/server.json\n"
+"example:   sudo GTS-server -c /etc/GTS/server.json -d start\n"
 "           sudo GTS-client -c /etc/GTS/client.json\n"
 "\n"
 "header_key of client is not necessary(if not provide here, it must be provided in config_file)\n"
