@@ -277,7 +277,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         return -1;
     }
     cJSON_Delete(json);
-	return 0;
+    return 0;
 }
 
 char* generate_stat_info(hash_ctx_t *ctx){
@@ -292,7 +292,7 @@ char* generate_stat_info(hash_ctx_t *ctx){
     for(client = ctx->token_to_clients; client != NULL; client=client->hh1.next){
         cJSON *user;
         cJSON_AddItemToArray(info, user = cJSON_CreateObject());
-        sprintf(print_token, "%2x%2x%2x%2x%2x%2x",(uint8_t)client->token[0],
+        sprintf(print_token, "%02x%02x%02x%02x%02x%02x",(uint8_t)client->token[0],
                 (uint8_t)client->token[1], (uint8_t)client->token[2],(uint8_t)client->token[3],
                 (uint8_t)client->token[4], (uint8_t)client->token[5]);
         cJSON_AddStringToObject(user, "token", print_token);
