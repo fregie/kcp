@@ -146,21 +146,19 @@ int json_parse(gts_args_t *gts_args, char *filename){
                 printf("token and password of server must be an array");
                 return -1;
             }
-            if (gts_args->encrypt == 1){
-                if (cJSON_GetArraySize(cJSON_GetObjectItem(json,"password")) != cJSON_GetArraySize(cJSON_GetObjectItem(json,"token"))){
-                    printf("token numbers != password numbers\n");
-                    return -1;
-                }
-                //init password
-                gts_args->password = malloc(MAX_USER*sizeof(char*));
-                password = cJSON_GetObjectItem(json,"password")->child;
-                int k = 0;
-                while (password != 0){
-                    gts_args->password[k] = password->valuestring;
-                    password = password->next;
-                    k++;
-                } 
+            if (cJSON_GetArraySize(cJSON_GetObjectItem(json,"password")) != cJSON_GetArraySize(cJSON_GetObjectItem(json,"token"))){
+                printf("token numbers != password numbers\n");
+                return -1;
             }
+            //init password
+            gts_args->password = malloc(MAX_USER*sizeof(char*));
+            password = cJSON_GetObjectItem(json,"password")->child;
+            int k = 0;
+            while (password != 0){
+                gts_args->password[k] = password->valuestring;
+                password = password->next;
+                k++;
+            } 
             //init tokens
             gts_args->token = malloc(MAX_USER*sizeof(char*));
             token_json = cJSON_GetObjectItem(json,"token")->child;
@@ -190,15 +188,13 @@ int json_parse(gts_args_t *gts_args, char *filename){
                 printf("token and password of client must string");
                 return -1;
             }
-            if (gts_args->encrypt == 1){
-                //init password
-                gts_args->password = malloc(sizeof(char*));
-                if (cJSON_HasObjectItem(json,"password") == 1){
-                    gts_args->password[0] = cJSON_GetObjectItem(json,"password")->valuestring;
-                }else{
-                    printf("can't find password\n");
-                    return -1;
-                }
+            //init password
+            gts_args->password = malloc(sizeof(char*));
+            if (cJSON_HasObjectItem(json,"password") == 1){
+                gts_args->password[0] = cJSON_GetObjectItem(json,"password")->valuestring;
+            }else{
+                printf("can't find password\n");
+                return -1;
             }
             // init token
             gts_args->token = malloc(sizeof(char*));
