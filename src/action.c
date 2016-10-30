@@ -277,6 +277,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         return -1;
     }
     cJSON_Delete(json);
+	return 0;
 }
 
 char* generate_stat_info(hash_ctx_t *ctx){
