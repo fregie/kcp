@@ -262,10 +262,6 @@ int main(int argc, char **argv) {
                 }
                 continue;
             }
-            if (client->txquota > UNLIMIT){
-                client->txquota -= (length - GTS_HEADER_LEN);
-            }
-            client->tx += (length - GTS_HEADER_LEN);
             //save source address
             client->source_addr.addrlen = temp_remote_addrlen;
             memcpy(&client->source_addr.addr, &temp_remote_addr, temp_remote_addrlen);
@@ -289,6 +285,12 @@ int main(int argc, char **argv) {
                     break;
                 }
             }
+            //------- make sure the package is not flag package ,then add txquota --------
+            if (client->txquota > UNLIMIT){
+                client->txquota -= (length - GTS_HEADER_LEN);
+            }
+            client->tx += (length - GTS_HEADER_LEN);
+            // ---------------------------------------------------------------------------
             if (-1 == nat_fix_upstream(client, gts_args->recv_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN)){
                 continue;
             }
