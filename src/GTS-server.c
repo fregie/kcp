@@ -284,6 +284,7 @@ int main(int argc, char **argv) {
                 if (-1 == send_flag_msg(FLAG_OK, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
                     break;
                 }
+                continue;
             }
             //------- make sure the package is not flag package ,then add txquota --------
             if (client->txquota > UNLIMIT){
