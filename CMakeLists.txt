@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.6)
 
 project(GTS C)
 
-SET(CMAKE_BUILD_TYPE "Release") 
+SET(CMAKE_BUILD_TYPE "Debug") 
 
 SET(CMAKE_MODULE_PATH ${GTS_SOURCE_DIR}/cmake)
 SET(EXECUTABLE_OUTPUT_PATH ${GTS_BINARY_DIR}/bin)
