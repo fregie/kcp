@@ -330,6 +330,9 @@ int main(int argc, char **argv) {
                 client->txquota -= length;
             }
             client->rx += length;
+            if (length <= 32 || length >= 1500){
+                errf("sentto length: %d", length+GTS_HEADER_LEN);
+            }
             if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
                 length + GTS_HEADER_LEN, 0,
                 (struct sockaddr*)&client->source_addr.addr,
@@ -366,6 +369,7 @@ int main(int argc, char **argv) {
                     send_buf = generate_stat_info(hash_ctx);
                 }
                 sendto(gts_args->IPC_sock, send_buf, strlen(send_buf),0, (struct sockaddr*)&pmapi_addr, len);
+                errf("free send_buf line:372 in GTS-server");
                 free(send_buf);
                 check_date(hash_ctx);
         }

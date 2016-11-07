@@ -99,7 +99,7 @@ client_info_t* nat_fix_downstream(hash_ctx_t *hash_ctx, unsigned char *buf, size
     client_info_t *client = NULL;
     HASH_FIND(hh2, hash_ctx->ip_to_clients, &iphdr->daddr, 4, client);
     if (client == NULL) {
-        errf("nat: client not found for given user ip");
+        // errf("nat: client not found for given user ip");
         return NULL;
     }
     int32_t acc = 0;
