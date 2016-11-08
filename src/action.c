@@ -402,5 +402,8 @@ int set_env(gts_args_t *gts_args){
     if (-1 == setenv("mtu", mtu, 1)){
         err("setenv");
     }
+    if (-1 == setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1)){
+        err("setenv");
+    }
     return 0;
 }

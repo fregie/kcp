@@ -2,7 +2,6 @@
 	> File Name: test.c
 	> Author: fregie
 	> Mail: fregie@geewan.com
-	> Created Time: 2016年04月30日 星期六 11时04分28秒
  ************************************************************************/
 
 #include<stdio.h>
@@ -17,10 +16,10 @@
 
 //define action message
 //change here to change action
-#define ADD_USER "{\"act\":\"add_user\",\"token\":\"b88d9ad8eabb\",\"password\":\"geewantest\",\"txquota\":1024,\"expire\":\"2017/6/3 14:57:00\"}"
-#define DEL_USER "{\"act\":\"del_user\",\"token\":\"b88d9ad8eabb\"}"
+#define ADD_USER "{\"act\":\"add_user\",\"token\":\"b88d9ad8eab2\",\"password\":\"geewantest123456789123456789123456789\",\"txquota\":10240000,\"expire\":\"2017/6/3 14:57:00\"}"
+#define DEL_USER "{\"act\":\"del_user\",\"token\":\"b88d9ad8eab2\"}"
 #define SHOW_STAT "{\"act\":\"show_stat\"}"
-char *msg_to_send = SHOW_STAT;
+char *msg_to_send = DEL_USER;
 
 //define unix domain socket path
 #define pmmanager "/tmp/GTS.sock"

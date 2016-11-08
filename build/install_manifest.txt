@@ -1,0 +1,8 @@
+/usr/local/bin/gts-ser
+/usr/local/bin/gts-cli
+/etc/gts/server.json
+/etc/gts/client.json
+/etc/gts/server_up.sh
+/etc/gts/server_down.sh
+/etc/gts/client_up.sh
+/etc/gts/client_down.sh
