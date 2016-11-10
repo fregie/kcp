@@ -137,13 +137,11 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         return -1;
     }
     if (strcmp(act,"add_user") == 0){
-        errf("add user");
         client_info_t *client = malloc(sizeof(client_info_t));
         client_info_t *temp_client = NULL;
         bzero(client, sizeof(client_info_t));
         if (cJSON_HasObjectItem(json,"token") == 1){
             char *token = cJSON_GetObjectItem(json,"token")->valuestring;
-            errf("token: %s", token);
             int p = 0;
             while (p < TOKEN_LEN){
                 unsigned int temp;
@@ -234,10 +232,10 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             HASH_FIND(hh2, ctx->ip_to_clients, &temp_ip, 4,temp_client);
             if(temp_client == NULL){
                 client->output_tun_ip = temp_ip;
-                errf("output tun ip: %u", temp_ip);
                 break;
             }
         }
+        client->source_addr.addrlen = NO_SOURCE_ADDR;
         if(client == NULL){
             errf("add user failed!,may be too many user");
             free(client);
@@ -250,7 +248,6 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         return 0;
     }else if(strcmp(act,"del_user") == 0){
         char *token = cJSON_GetObjectItem(json,"token")->valuestring;
-        errf("del user: %s", token);
         char real_token[TOKEN_LEN];
         int p = 0;
         while (p < 7){
@@ -275,7 +272,6 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         HASH_DELETE(hh2,ctx->ip_to_clients, client);
         free(client);
     }else if(strcmp(act,"show_stat") == 0){
-        errf("act show stat");
         cJSON_Delete(json);
         return 1;
     }else{

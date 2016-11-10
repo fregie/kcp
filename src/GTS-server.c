@@ -324,31 +324,36 @@ int main(int argc, char **argv) {
             }else{
                 crypt_len = ENCRYPT_LEN;
             }
+            if (client->source_addr.addrlen == NO_SOURCE_ADDR){
+                errf("can't find source addr of client");
+                // should continue here,comment to test id the problem caused by this
+                continue;
+            }
             crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, crypt_len, client->key);
             memcpy(gts_args->recv_buf, client->encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
             if (client->txquota > UNLIMIT){
                 client->txquota -= length;
             }
             client->rx += length;
-            if (length <= 32 || length >= 1500){
-                errf("sentto length: %d", length+GTS_HEADER_LEN);
-            }
             if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
                 length + GTS_HEADER_LEN, 0,
                 (struct sockaddr*)&client->source_addr.addr,
                 (socklen_t)client->source_addr.addrlen))
             {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        // do nothing
-                    } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-                                errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-                        // just log, do nothing
-                        err("sendto");
-                    } else {
-                        err("sendto");
-                        // TODO rebuild socket
-                        break;
-                    }
+                errf("sendto failed: errno %d", errno);
+                errf("length: %d", length + GTS_HEADER_LEN);
+
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // do nothing
+                } else if (errno == ENETUNREACH || errno == ENETDOWN ||
+                            errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
+                    // just log, do nothing
+                    err("sendto");
+                } else {
+                    err("sendto");
+                    // TODO rebuild socket
+                    break;
+                }
             }
         }
         if (FD_ISSET(gts_args->IPC_sock, &readset)){
@@ -369,12 +374,12 @@ int main(int argc, char **argv) {
                     send_buf = generate_stat_info(hash_ctx);
                 }
                 sendto(gts_args->IPC_sock, send_buf, strlen(send_buf),0, (struct sockaddr*)&pmapi_addr, len);
-                errf("free send_buf line:372 in GTS-server");
                 free(send_buf);
                 check_date(hash_ctx);
         }
     }
     close(gts_args->UDP_sock);
-    free(gts_args);
+    // free(gts_args);
+    errf("exiting gts-ser");
     return 0;
 }

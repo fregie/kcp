@@ -125,6 +125,8 @@ client_info_t* nat_fix_downstream(hash_ctx_t *hash_ctx, unsigned char *buf, size
             }
             udp_hdr_t *udphdr = ip_payload;
             ADJUST_CHECKSUM(acc, udphdr->checksum);
+        }else{
+            errf("nat: not tcp and not udp");
         }
     }
     return client;

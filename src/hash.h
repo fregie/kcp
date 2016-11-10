@@ -6,6 +6,7 @@
 
 #define UNLIMIT -10000
 #define OVER_DATE 1
+#define NO_SOURCE_ADDR -1
 
 typedef struct {
   struct sockaddr_storage addr;
