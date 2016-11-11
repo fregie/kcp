@@ -19,6 +19,7 @@ int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args){
         //     tun IP is 10.7.0.1
         //     client IPs will be 10.7.0.2, 10.7.0.3, 10.7.0.4, etc
         client->output_tun_ip = htonl(gts_args->netip + i + 1);
+        client->source_addr.addrlen = NO_SOURCE_ADDR;
         client->rx = 0;
         client->tx = 0;
         client->txquota = UNLIMIT;
