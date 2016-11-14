@@ -116,7 +116,6 @@ unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, uint8_t flag, DES_k
     memset(data_block + VER_LEN, flag, FLAG_LEN);
     memcpy(data_block + VER_LEN + FLAG_LEN, token, TOKEN_LEN);
     DES_ecb_encrypt((const_DES_cblock*)data_block, (DES_cblock*)encrypted_header, ks, DES_ENCRYPT);
-    errf("free data_block in action.c line 119");
     free(data_block);
     return (unsigned char*)encrypted_header;
 }
