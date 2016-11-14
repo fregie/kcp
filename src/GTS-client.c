@@ -295,7 +295,8 @@ int main(int argc, char **argv){
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, gts_args->mtu);
             if (stat_code != FLAG_OK || time(NULL) - last_recv_time >=3*gts_args->beat_time ){
-                continue;
+                // errf("statue not ok, continue.");
+                // continue;
             }
             if (length == -1){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
