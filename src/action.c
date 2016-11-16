@@ -183,7 +183,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         client->tx = 0;
         client->over_date = 0;
         if (cJSON_HasObjectItem(json,"txquota") == 1 && cJSON_GetObjectItem(json,"txquota")->type == cJSON_Number){
-            client->txquota = cJSON_GetObjectItem(json,"txquota")->valueint;
+            client->txquota = (int64_t)cJSON_GetObjectItem(json,"txquota")->valuedouble;
             if (client->txquota == -1){
                 client->txquota = UNLIMIT;
             }else{
@@ -269,6 +269,8 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         errf("outout ip: %u", client->output_tun_ip);
         HASH_DELETE(hh1,ctx->token_to_clients, client);
         HASH_DELETE(hh2,ctx->ip_to_clients, client);
+        free(client->encrypted_header);
+        free(client->expire);
         free(client);
     }else if(strcmp(act,"show_stat") == 0){
         cJSON_Delete(json);
