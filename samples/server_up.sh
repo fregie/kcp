@@ -1,5 +1,5 @@
 #!/bin/sh
-/usr/sbin/sysctl -w net.ipv4.ip_forward=1
+sysctl -w net.ipv4.ip_forward=1
 
 ip addr add $net dev $intf
 ip link set $intf mtu $mtu
