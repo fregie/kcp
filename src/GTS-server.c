@@ -4,7 +4,7 @@
 #include "hash.h"
 #include <signal.h>
 
-#define MAX_IPC_LEN 200
+#define MAX_IPC_LEN 500
 #define ACT_OK "{\"status\":\"ok\"}"
 #define ACT_FAILED "{\"status\":\"failed\"}"
 #define CHECK_TIME 300
@@ -183,10 +183,20 @@ int main(int argc, char **argv) {
         system(cmd);
         free(cmd);
     }
+    //get out interface name ,for traffic contrl
+    FILE *stream = popen("ip route show 0/0 | sed -e 's/.* dev \\([^ ]*\\).*/\\1/'", "r" );
+    if (fgets(gts_args->out_intf, MAX_INTF_LEN, stream) == NULL){
+        errf("get out interface failed, traffic control may not work");
+    }
+    pclose(stream);
+    char *temp =strchr(gts_args->out_intf, '\n');
+    if ( temp!= NULL){
+        *temp = 0;
+    }
     fd_set readset;
     int max_fd;
     int crypt_len;
-    gts_header_t *gts_header = gts_args->recv_buf;
+    gts_header_t *gts_header = (gts_header_t*)gts_args->recv_buf;
     time_t last_check_data = time(NULL) - CHECK_TIME;
     
     while (1){

@@ -120,6 +120,91 @@ unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, uint8_t flag, DES_k
     return (unsigned char*)encrypted_header;
 }
 
+#define MAX_IP_LENGTH 16
+#define MAX_CMD_LENGTH 200
+#define INFINITE 0
+
+static void add_traffic_control(char* tun_name , char* out_intf_name,
+                                uint32_t server_ip, uint32_t output_ip,
+                                int64_t up_limit, int64_t up_burst,
+                                int64_t down_limit, int64_t down_burst){
+    if (up_limit < 0 || up_burst < 0 || down_limit < 0 || down_burst < 0){
+        errf("traffic control error!\nup limit: %ld      up burst: %ld\ndown limit: %ld    down burst: %ld", 
+              up_limit, up_burst, down_limit, down_burst);
+        return;
+    }
+    char ip[MAX_IP_LENGTH];
+    char cmd[MAX_CMD_LENGTH];
+    int client_id = output_ip - server_ip;
+    unsigned char *bytes = (unsigned char*)&output_ip;
+    snprintf(ip, sizeof(ip), "%d.%d.%d.%d", 
+             bytes[3],bytes[2],bytes[1],bytes[0]); //host, not net
+    //control down stream
+    if (down_limit != INFINITE && down_burst != INFINITE){
+        snprintf(cmd, MAX_CMD_LENGTH,"tc class add dev %s parent 1: classid 1:%d htb rate %ldkbps ceil %ldkbps burst %ldk cburst %ldk",
+                tun_name, client_id, down_limit, down_limit*2, down_burst, down_burst);
+        system(cmd);
+
+        bzero(cmd, MAX_CMD_LENGTH);
+        snprintf(cmd, MAX_CMD_LENGTH,"tc filter add dev %s parent 1: prio %d u32 match ip dst %s flowid 1:%d",
+                tun_name, client_id, ip, client_id);
+        system(cmd);
+    }
+    //control up stream
+    if (up_limit != INFINITE && up_burst != INFINITE){
+        bzero(cmd, MAX_CMD_LENGTH);
+        snprintf(cmd, MAX_CMD_LENGTH,"tc class add dev %s parent 1: classid 1:%d htb rate %ldkbps ceil %ldkbps burst %ldk cburst %ldk",
+                out_intf_name, client_id, up_limit, up_limit*2, up_burst, up_burst);
+        system(cmd);
+
+        bzero(cmd, MAX_CMD_LENGTH);
+        snprintf(cmd, MAX_CMD_LENGTH, "tc filter add dev %s parent 1: protocol ip prio %d handle %d fw classid 1:%d",
+                out_intf_name, client_id, client_id, client_id);
+        system(cmd);
+        //set mark:id for up stream
+        bzero(cmd, MAX_CMD_LENGTH);
+        snprintf(cmd, MAX_CMD_LENGTH, "iptables -I PREROUTING -t mangle -p udp -s %s -j MARK --set-mark %d",
+                ip, client_id);
+        system(cmd);
+        bzero(cmd, MAX_CMD_LENGTH);
+        snprintf(cmd, MAX_CMD_LENGTH, "iptables -I PREROUTING -t mangle -p tcp -s %s -j MARK --set-mark %d",
+                ip, client_id);
+        system(cmd);
+    }
+}
+
+static void del_traffic_control(char* tun_name, char* out_intf_name,
+                                uint32_t server_ip, uint32_t output_ip){
+    char ip[MAX_IP_LENGTH];
+    char cmd[MAX_CMD_LENGTH];
+    int client_id = output_ip - server_ip;
+    unsigned char *bytes = (unsigned char*)&output_ip;
+    snprintf(ip, sizeof(ip), "%d.%d.%d.%d", 
+             bytes[3],bytes[2],bytes[1],bytes[0]); //host, not net
+    snprintf(cmd,MAX_CMD_LENGTH,"tc filter del dev %s parent 1: prio %d",tun_name, client_id);
+    system(cmd);
+
+    bzero(cmd, MAX_CMD_LENGTH);
+    snprintf(cmd,MAX_CMD_LENGTH,"tc class del dev %s parent 1: classid 1:%d",tun_name, client_id);
+    system(cmd);
+
+    bzero(cmd, MAX_CMD_LENGTH);
+    snprintf(cmd,MAX_CMD_LENGTH,"tc filter del dev %s parent 1: prio %d",out_intf_name, client_id);
+    system(cmd);
+
+    bzero(cmd, MAX_CMD_LENGTH);
+    snprintf(cmd,MAX_CMD_LENGTH,"tc class del dev %s parent 1: classid 1:%d",out_intf_name, client_id);
+    system(cmd);
+
+    bzero(cmd, MAX_CMD_LENGTH);
+    snprintf(cmd,MAX_CMD_LENGTH,"iptables -D PREROUTING -t mangle -p udp -s %s -j MARK --set-mark %d",ip, client_id);
+    system(cmd);
+
+    bzero(cmd, MAX_CMD_LENGTH);
+    snprintf(cmd,MAX_CMD_LENGTH,"iptables -D PREROUTING -t mangle -p tcp -s %s -j MARK --set-mark %d",ip, client_id);
+    system(cmd);
+}
+
 int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
     char *act;
     cJSON *json;
@@ -241,6 +326,29 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             cJSON_Delete(json);
             return -1;
         }
+        //traffic control
+        int64_t up_limit, up_burst, down_limit, down_burst;
+        if (cJSON_HasObjectItem(json,"up_limit") == 1 && cJSON_HasObjectItem(json,"up_burst") == 1 &&
+                cJSON_GetObjectItem(json,"up_limit")->type == cJSON_Number && 
+                cJSON_GetObjectItem(json,"up_limit")->type == cJSON_Number){
+            up_limit = (int64_t)cJSON_GetObjectItem(json,"up_limit")->valuedouble;
+            up_burst = (int64_t)cJSON_GetObjectItem(json,"up_burst")->valuedouble;
+        }else{
+            up_limit = INFINITE;
+            up_burst = INFINITE;
+        }
+        if (cJSON_HasObjectItem(json,"down_limit") == 1 && cJSON_HasObjectItem(json,"down_burst") == 1 &&
+                cJSON_GetObjectItem(json,"down_limit")->type == cJSON_Number && 
+                cJSON_GetObjectItem(json,"down_burst")->type == cJSON_Number){
+            down_limit = (int64_t)cJSON_GetObjectItem(json,"down_limit")->valuedouble;
+            down_burst = (int64_t)cJSON_GetObjectItem(json,"down_burst")->valuedouble;
+        }else{
+            down_limit = INFINITE;
+            down_burst = INFINITE;
+        }
+            add_traffic_control(gts_args->intf, (char*)gts_args->out_intf,
+                                gts_args->netip, ntohl(client->output_tun_ip), 
+                                up_limit, up_burst, down_limit, down_burst);
         HASH_ADD(hh1, ctx->token_to_clients, token, TOKEN_LEN, client);
         HASH_ADD(hh2, ctx->ip_to_clients, output_tun_ip, 4, client);
         cJSON_Delete(json);
@@ -266,11 +374,12 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             errf("can't find token from hash table");
             return -1;
         }
-        errf("outout ip: %u", client->output_tun_ip);
+        // errf("outout ip: %u", client->output_tun_ip);
+        del_traffic_control(gts_args->intf, (char*)gts_args->out_intf, gts_args->netip, ntohl(client->output_tun_ip));
         HASH_DELETE(hh1,ctx->token_to_clients, client);
         HASH_DELETE(hh2,ctx->ip_to_clients, client);
         free(client->encrypted_header);
-        free(client->expire);
+        free(client->expire);   
         free(client);
     }else if(strcmp(act,"show_stat") == 0){
         cJSON_Delete(json);

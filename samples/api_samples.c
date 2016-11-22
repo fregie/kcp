@@ -16,10 +16,12 @@
 
 //define action message
 //change here to change action
-#define ADD_USER "{\"act\":\"add_user\",\"token\":\"b88d9ad8eab2\",\"password\":\"geewantest123456789123456789123456789\",\"txquota\":10240000,\"expire\":\"2017/6/3 14:57:00\"}"
+#define ADD_USER "{\"act\":\"add_user\",\"token\":\"b88d9ad8eab2\",\"password\":\"geewantest123456789123456789123456789\",\
+\"txquota\":10240000,\"expire\":\"2017/6/3 14:57:00\", \
+\"up_limit\":0,\"up_burst\":512,\"down_limit\":256,\"down_burst\":512}"
 #define DEL_USER "{\"act\":\"del_user\",\"token\":\"b88d9ad8eab2\"}"
 #define SHOW_STAT "{\"act\":\"show_stat\"}"
-char *msg_to_send = DEL_USER;
+char *msg_to_send = ADD_USER;
 
 //define unix domain socket path
 #define pmmanager "/tmp/GTS.sock"

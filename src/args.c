@@ -247,6 +247,7 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
     gts_args->ver = GTS_VER;
     
     gts_args->recv_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
+    gts_args->out_intf = malloc(MAX_INTF_LEN);
     
     gts_args->remote_addr_len = sizeof(gts_args->remote_addr);
     

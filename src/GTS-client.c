@@ -266,7 +266,7 @@ int main(int argc, char **argv){
             if (gts_header->flag != FLAG_MSG){
                 stat_code = gts_header->flag;
                 if (stat_code != FLAG_OK){
-                    errf("stat code : %d", stat_code);
+                    // errf("stat code : %d", stat_code);
                 }
                 continue;
             }
@@ -294,8 +294,9 @@ int main(int argc, char **argv){
         //read from tun and send to server
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, gts_args->mtu);
-            if (stat_code != FLAG_OK || time(NULL) - last_recv_time >=3*gts_args->beat_time ){
-                // errf("statue not ok, continue.");
+            if (time(NULL) - last_recv_time >=5*gts_args->beat_time ){
+                stat_code = FLAG_NO_RESPONSE;
+                errf("can't recv server response");
                 // continue;
             }
             if (length == -1){

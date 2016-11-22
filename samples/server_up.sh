@@ -12,4 +12,9 @@ iptables -A FORWARD -d $net -j ACCEPT
 # Turn on MSS fix (MSS = MTU - TCP header - IP header)
 iptables -t mangle -A FORWARD -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
+out_intf=$(ip route show 0/0 | sed -e 's/.* dev \([^ ]*\).*/\1/')
+
+tc qdisc add dev $out_intf root handle 1: htb default 256
+tc qdisc add dev $intf root handle 1: htb default 256
+
 echo $0 done
