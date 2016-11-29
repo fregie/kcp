@@ -82,10 +82,10 @@ client.json:
 ## 运行
 服务端：  
 
-    sudo GTS-server -c /etc/GTS/server.json -d start/stop/restart
+    (sudo) GTS-server -c /etc/GTS/server.json [-d {start|stop|restart}]
 客户端：  
 
-    sudo GTS-server -c /etc/GTS/server.json -d start/stop/restart
+    (sudo) GTS-server -c /etc/GTS/server.json [-d {start|stop|restart}]
 
     -c  <config file>    指定配置文件的路径
     -d  <action>         start/stop/restart  以daemon模式运行
@@ -103,7 +103,11 @@ client.json:
         "token":"b88d9ad8eabb",         # 添加用户的token
         "password":"789632145",         # 添加用户的pasword
         "txquota":"1024",               # 允许用户消耗的流量（KB）(-1为无限制)
-        "expire":"2016/01/02 12:12:00"  # 允许用户在该日期前使用
+        "expire":"2016/01/02 12:12:00", # 允许用户在该日期前使用
+        "up_limit":512,                 # 对用于进行上行流控(KBps)(-1为无限制)
+        "up_burst":1024,                # 允许的上行突发流量(KB)
+        "down_limit":512,               # 下行流控(KBps)
+        "down_burst":1024               # 下行突发流量(KB)
     }
 返回信息：
 
@@ -152,11 +156,12 @@ client.json:
     {"stat":"2"}
 客户端状态代码查询表：
 
- Code   | stat            
- ------ |----------------
- 2      | 状态良好         
- 3      | header key 错误  
- 4      | 未找到token      
- 5      | 密码错误         
- 6      | 超出流量限制      
- 7      | 超出日期限制
+  Code |    stat            
+ ------|----------------
+   2   | 状态良好         
+   3   | header key 错误  
+   4   | 未找到token      
+   5   | 密码错误         
+   6   | 超出流量限制      
+   7   | 超出日期限制
+   8   | 连接服务器超时
