@@ -122,13 +122,13 @@ unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, uint8_t flag, DES_k
 
 #define MAX_IP_LENGTH 16
 #define MAX_CMD_LENGTH 200
-#define INFINITE 0
+#define INFINITE -1
 
 static void add_traffic_control(char* tun_name , char* out_intf_name,
                                 uint32_t server_ip, uint32_t output_ip,
                                 int64_t up_limit, int64_t up_burst,
                                 int64_t down_limit, int64_t down_burst){
-    if (up_limit < 0 || up_burst < 0 || down_limit < 0 || down_burst < 0){
+    if (up_limit < INFINITE || up_burst < INFINITE || down_limit < INFINITE || down_burst < INFINITE){
         errf("traffic control error!\nup limit: %ld      up burst: %ld\ndown limit: %ld    down burst: %ld", 
               up_limit, up_burst, down_limit, down_burst);
         return;
