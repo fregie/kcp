@@ -15,4 +15,3 @@ ADD_DEFINITIONS(-Os -Wall --std=gnu99)
 
 ADD_SUBDIRECTORY(src)
 ADD_SUBDIRECTORY(samples)
-

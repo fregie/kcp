@@ -90,7 +90,7 @@ int main(int argc, char **argv){
     int ch;
     char *conf_file = NULL;
     char *header_key = NULL;
-    char *act = NULL;
+    char *act = "none";
     while ((ch = getopt(argc, argv, "c:kd:v")) != -1){
         switch (ch){
         case 'c':
@@ -110,7 +110,7 @@ int main(int argc, char **argv){
             break;
         }
     }
-    if (argc == 1 || conf_file == NULL || act == NULL){
+    if (argc == 1 || conf_file == NULL){
         print_help();
         return EXIT_FAILURE;
     }
@@ -174,12 +174,10 @@ int main(int argc, char **argv){
         errf("GTS_crypto_init failed");
         return EXIT_FAILURE;
     }
-    if (gts_args->encrypt == 1){
-        if (crypto_generichash(key, sizeof key, (unsigned char *)gts_args->password[0],
-                               strlen(gts_args->password[0]), NULL, 0) != 0){
-            errf("can't set password");
-            return EXIT_FAILURE;
-        }
+    if (crypto_generichash(key, sizeof key, (unsigned char *)gts_args->password[0],
+                            strlen(gts_args->password[0]), NULL, 0) != 0){
+        errf("can't set password");
+        return EXIT_FAILURE;
     }
     
     signal(SIGINT, sig_handler);
@@ -229,7 +227,12 @@ int main(int argc, char **argv){
             temp_time += gts_args->beat_time;
             randombytes_buf(gts_args->recv_buf + GTS_HEADER_LEN, RANDOM_MSG_LEN);
             memcpy(gts_args->recv_buf, syn_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
-            crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, RANDOM_MSG_LEN, key);
+            if (gts_args->encrypt == 1){
+                crypt_len = length;
+            }else{
+                crypt_len = ENCRYPT_LEN;
+            }
+            crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, crypt_len, key);
             if (sendto(gts_args->UDP_sock, gts_args->recv_buf,
                 RANDOM_MSG_LEN + GTS_HEADER_LEN, 0,
                 (struct sockaddr*)&gts_args->server_addr,
@@ -305,7 +308,7 @@ int main(int argc, char **argv){
             if (gts_header->flag != FLAG_MSG){
                 stat_code = gts_header->flag;
                 if (stat_code != FLAG_OK){
-                    errf("stat code : %d", stat_code);
+                    // errf("stat code : %d", stat_code);
                 }
                 continue;
             }
@@ -333,8 +336,10 @@ int main(int argc, char **argv){
         //read from tun and send to server
         if (FD_ISSET(gts_args->tun, &readset)){
             length = read(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, gts_args->mtu);
-            if (stat_code != FLAG_OK || time(NULL) - last_recv_time >=3*gts_args->beat_time ){
-                continue;
+            if (time(NULL) - last_recv_time >=5*gts_args->beat_time ){
+                stat_code = FLAG_NO_RESPONSE;
+                errf("can't recv server response");
+                // continue;
             }
             if (length == -1){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {

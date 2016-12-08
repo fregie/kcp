@@ -26,7 +26,7 @@
 #define MAX_USER 255
 
 #define GTS_VER 1
-#define GTS_RELEASE_VER "0.0.1"
+#define GTS_RELEASE_VER "1.1.0"
 
 #define IPC_FILE "/tmp/GTS.sock"
 #define TUN_MTU 1432  // 1492 (Ethernet) - 20 (IPv4, or 40 for IPv6) - 8 (UDP) - 32 (GTS header)
@@ -48,6 +48,7 @@
 #define FLAG_PASSWORD_ERR 5
 #define FLAG_OVER_TXQUOTA 6
 #define FLAG_OVER_DATE 7
+#define FLAG_NO_RESPONSE 8
 
 /*               GTS_header 32bytes
 0        8        16                              63
@@ -74,6 +75,7 @@ typedef enum{
     GTS_MODE_CLIENT = 2
 } gts_mode;
 
+#define MAX_INTF_LEN 30
 typedef struct{
   gts_mode mode;
   int encrypt;
@@ -84,6 +86,7 @@ typedef struct{
   char *shell_up;
   char *shell_down;
   char *intf;
+  char *out_intf;
   int mtu;
   // declare fds
   int tun;
@@ -96,7 +99,7 @@ typedef struct{
   struct sockaddr_in remote_addr;
   socklen_t remote_addr_len;
   
-  unsigned char *header_key;
+  char *header_key;
   uint8_t ver;
   char **token;
   size_t token_len;

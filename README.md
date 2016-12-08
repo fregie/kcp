@@ -3,6 +3,9 @@ GTS(Geewan Transimit System) provides an new way to transmit you data securely a
 ## 安装
 linux：  
 
+    # install openssl
+    yum install openssl-devel
+
     # install libsodium
     wget https://github.com/jedisct1/libsodium/releases/download/1.0.10/libsodium-1.0.10.tar.gz
     tar xf libsodium-1.0.10.tar.gz && cd libsodium-1.0.10
@@ -13,7 +16,8 @@ linux：
     # git source code and compile
     git clone https://username@github.com/geewan-rd/GTS.git
     cd GTS/ && git checkout develop
-    mkdir build && cmake .. && make
+    mkdir build && cd build 
+    cmake .. && make
     sudo make install
 
     # if you wish to static link libsodium, run cmake with -DSODIUM_USE_STATIC_LIBRARY=ON
@@ -51,7 +55,8 @@ server.json:
     "encrypt":1,                                # 是否对payload部分进行加密（openwrt版本消耗性能较大）
     "shell_up":"/etc/GTS/server_up.sh",         # 启动脚本路径
     "shell_down":"/etc/GTS/server_down.sh",     # 结束脚本路径
-    "logfile":"/var/log/GTS-server.log"         # 日志文件路径
+    "logfile":"/var/log/GTS-server.log",        # 日志文件路径
+    "pidfile":""/var/run/gts.pid""              # pid文件路径
     }
 
 client.json:  
@@ -60,26 +65,30 @@ client.json:
     {
     "server":"0.0.0.0",                         # 服务端ip
     "port":6666,
-    "header key":"1234ABCE",
+    "header_key":"1234ABCE",
     "token":"b88d9ad8eabb",                     # 客户端使用的token
     "password":"geewantest",                    # token对应的密码
     "intf":"GTSc_tun",
     "mtu":1432,
     "net":"10.1.0.2/24",
     "encrypt":1,
-    "beat time":5,                              # 向服务器发送心跳的间隔（秒）
+    "beat_time":5,                              # 向服务器发送心跳的间隔（秒）
     "shell_up":"/etc/GTS/client_up.sh",
     "shell_down":"/etc/GTS/client_down.sh",
-    "logfile":"/var/log/GTS-client.log"
+    "logfile":"/var/log/GTS-client.log",
+    "pidfile":""/var/run/gts.pid""
     }
 
 ## 运行
 服务端：  
 
-    sudo GTS-server -c /etc/GTS/server.json -k header_key(可选)
+    (sudo) GTS-server -c /etc/GTS/server.json [-d {start|stop|restart}]
 客户端：  
 
-    sudo GTS-server -c /etc/GTS/server.json -k header_key(可选)
+    (sudo) GTS-server -c /etc/GTS/server.json [-d {start|stop|restart}]
+
+    -c  <config file>    指定配置文件的路径
+    -d  <action>         start/stop/restart  以daemon模式运行
 
 ## IPC接口
 客户端和服务端都提供了 unix domain socket 形式的IPC接口  
@@ -94,7 +103,11 @@ client.json:
         "token":"b88d9ad8eabb",         # 添加用户的token
         "password":"789632145",         # 添加用户的pasword
         "txquota":"1024",               # 允许用户消耗的流量（KB）(-1为无限制)
-        "expire":"2016/01/02 12:12:00"  # 允许用户在该日期前使用
+        "expire":"2016/01/02 12:12:00", # 允许用户在该日期前使用
+        "up_limit":512,                 # 对用于进行上行流控(KBps)(-1为无限制)
+        "up_burst":1024,                # 允许的上行突发流量(KB)
+        "down_limit":512,               # 下行流控(KBps)
+        "down_burst":1024               # 下行突发流量(KB)
     }
 返回信息：
 
@@ -143,11 +156,12 @@ client.json:
     {"stat":"2"}
 客户端状态代码查询表：
 
- Code   | stat            
- ------ |----------------
- 2      | 状态良好         
- 3      | header key 错误  
- 4      | 未找到token      
- 5      | 密码错误         
- 6      | 超出流量限制      
- 7      | 超出日期限制
+  Code |    stat            
+ ------|----------------
+   2   | 状态良好         
+   3   | header key 错误  
+   4   | 未找到token      
+   5   | 密码错误         
+   6   | 超出流量限制      
+   7   | 超出日期限制
+   8   | 连接服务器超时

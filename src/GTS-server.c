@@ -6,7 +6,7 @@
 #include <signal.h>
 #include <sys/time.h>
 
-#define MAX_IPC_LEN 200
+#define MAX_IPC_LEN 500
 #define ACT_OK "{\"status\":\"ok\"}"
 #define ACT_FAILED "{\"status\":\"failed\"}"
 #define CHECK_TIME 300
@@ -120,7 +120,7 @@ static int udp_output(const char *buf, int len, ikcpcb *kcp, void *user){
 int main(int argc, char **argv) {
     int ch;
     char *conf_file = NULL;
-    char *act = NULL;
+    char *act = "none";
     while ((ch = getopt(argc, argv, "c:d:v")) != -1){
         switch (ch){
         case 'c':
@@ -137,7 +137,7 @@ int main(int argc, char **argv) {
             break;
         }
     }
-    if (argc == 1 || conf_file == NULL || act == NULL){
+    if (argc == 1 || conf_file == NULL){
         print_help();
         return EXIT_FAILURE;
     }
@@ -164,6 +164,16 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
         }
         return 0;
+    }
+    if(strcmp(act, "restart") == 0){
+        if (0 != daemon_stop(gts_args)) {
+        errf("can not start daemon");
+        return EXIT_FAILURE;
+        }
+        if (0 != daemon_start(gts_args)) {
+        errf("can not start daemon");
+        return EXIT_FAILURE;
+        }
     }
 
     if(init_log_file(gts_args->log_file) == -1){
@@ -207,10 +217,20 @@ int main(int argc, char **argv) {
         system(cmd);
         free(cmd);
     }
+    //get out interface name ,for traffic contrl
+    FILE *stream = popen("ip route show 0/0 | sed -e 's/.* dev \\([^ ]*\\).*/\\1/'", "r" );
+    if (fgets(gts_args->out_intf, MAX_INTF_LEN, stream) == NULL){
+        errf("get out interface failed, traffic control may not work");
+    }
+    pclose(stream);
+    char *temp =strchr(gts_args->out_intf, '\n');
+    if ( temp!= NULL){
+        *temp = 0;
+    }
     fd_set readset;
     int max_fd;
     int crypt_len;
-    gts_header_t *gts_header = gts_args->recv_buf;
+    gts_header_t *gts_header = (gts_header_t*)gts_args->recv_buf;
     time_t last_check_data = time(NULL) - CHECK_TIME;
     
     while (1){
@@ -294,10 +314,6 @@ int main(int argc, char **argv) {
                 }
                 continue;
             }
-            if (client->txquota > UNLIMIT){
-                client->txquota -= (length - GTS_HEADER_LEN);
-            }
-            client->tx += (length - GTS_HEADER_LEN);
             //save source address
             client->source_addr.addrlen = temp_remote_addrlen;
             memcpy(&client->source_addr.addr, &temp_remote_addr, temp_remote_addrlen);
@@ -320,7 +336,14 @@ int main(int argc, char **argv) {
                 if (-1 == send_flag_msg(FLAG_OK, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
                     break;
                 }
+                continue;
             }
+            //------- make sure the package is not flag package ,then add txquota --------
+            if (client->txquota > UNLIMIT){
+                client->txquota -= (length - GTS_HEADER_LEN);
+            }
+            client->tx += (length - GTS_HEADER_LEN);
+            // ---------------------------------------------------------------------------
             if (-1 == nat_fix_upstream(client, gts_args->recv_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN)){
                 continue;
             }
@@ -352,6 +375,11 @@ int main(int argc, char **argv) {
                 crypt_len = length;
             }else{
                 crypt_len = ENCRYPT_LEN;
+            }
+            if (client->source_addr.addrlen == NO_SOURCE_ADDR){
+                errf("can't find source addr of client");
+                // should continue here,comment to test id the problem caused by this
+                continue;
             }
             crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, crypt_len, client->key);
             memcpy(gts_args->recv_buf, client->encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
@@ -405,6 +433,7 @@ int main(int argc, char **argv) {
         }
     }
     close(gts_args->UDP_sock);
-    free(gts_args);
+    // free(gts_args);
+    errf("exiting gts-ser");
     return 0;
 }
