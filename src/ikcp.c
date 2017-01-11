@@ -340,6 +340,15 @@ void ikcp_release(ikcpcb *kcp)
 }
 
 
+//---------------------------------------------------------------------
+// set output callback, which will be invoked by kcp
+//---------------------------------------------------------------------
+void ikcp_setoutput(ikcpcb *kcp, int (*output)(const char *buf, int len,
+	ikcpcb *kcp, void *user))
+{
+	kcp->output = output;
+}
+
 
 //---------------------------------------------------------------------
 // user/upper level recv: returns size, returns below zero for EAGAIN
@@ -1251,6 +1260,15 @@ int ikcp_wndsize(ikcpcb *kcp, int sndwnd, int rcvwnd)
 int ikcp_waitsnd(const ikcpcb *kcp)
 {
 	return kcp->nsnd_buf + kcp->nsnd_que;
+}
+
+
+// read conv
+IUINT32 ikcp_getconv(const void *ptr)
+{
+	IUINT32 conv;
+	ikcp_decode32u((const char*)ptr, &conv);
+	return conv;
 }
 
 

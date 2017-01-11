@@ -2,6 +2,7 @@
 #include "action.h"
 #include "daemon.h"
 #include "ikcp.h"
+#include "functions.h"
 
 #include <signal.h>
 #include <openssl/evp.h>
@@ -27,7 +28,7 @@ clock_t end_time = 0;
 
 static char *shell_down = NULL;
 static unsigned char key[32];
-static int stat_code = FLAG_OK;
+static int stat_code = FLAG_SYN;
 
 static int UDP_socket;
 static struct sockaddr_in server_addr;
@@ -91,7 +92,9 @@ int main(int argc, char **argv){
     char *conf_file = NULL;
     char *header_key = NULL;
     char *act = "none";
-    while ((ch = getopt(argc, argv, "c:kd:v")) != -1){
+    int sndwnd = 128;
+    int rcvwnd = 128;
+    while ((ch = getopt(argc, argv, "c:kd:s:r:v")) != -1){
         switch (ch){
         case 'c':
             conf_file = strdup(optarg);
@@ -101,6 +104,16 @@ int main(int argc, char **argv){
             break;
         case 'd':
             act = strdup(optarg);
+            break;
+        case 'r':
+            rcvwnd = atoi(optarg);
+            if(rcvwnd == 0)
+                rcvwnd = 128;
+            break;
+        case 's':
+            sndwnd = atoi(optarg);
+            if(sndwnd == 0)
+                sndwnd = 128;
             break;
         case 'v':
             printf("\nGTS-----------geewan transmit system\nversion: %s\n", GTS_RELEASE_VER);
@@ -201,12 +214,11 @@ int main(int argc, char **argv){
     server_addr = gts_args->server_addr;
 
     // for kcp
-    struct timeval curr_time;
-    gettimeofday(&curr_time, NULL);
     ikcpcb *kcp = ikcp_create(0x11223344, (void*)0);
+    errf("kcp conv:%d", kcp->conv);
     kcp->output = udp_output;
-    ikcp_wndsize(kcp, 128, 128);
-    ikcp_nodelay(kcp, 1, 10, 2, 1);
+    ikcp_wndsize(kcp, sndwnd, rcvwnd);
+    ikcp_nodelay(kcp, 1, 20, 2, 1);
     kcp->rx_minrto = 10;
     kcp->fastresend = 1;
 
@@ -214,8 +226,6 @@ int main(int argc, char **argv){
     fd_set readset;
     int max_fd;
     struct timeval timeout;
-    timeout.tv_sec = 2;
-    timeout.tv_usec = 0;
     
     gts_header_t *gts_header = gts_args->recv_buf;
     int crypt_len;
@@ -223,7 +233,7 @@ int main(int argc, char **argv){
     time_t last_recv_time = time(NULL);
     //start working!
     while (1){
-        if (time(NULL) - temp_time >= gts_args->beat_time){
+        if (time(NULL) - temp_time >= gts_args->beat_time || stat_code == FLAG_SYN){
             temp_time += gts_args->beat_time;
             randombytes_buf(gts_args->recv_buf + GTS_HEADER_LEN, RANDOM_MSG_LEN);
             memcpy(gts_args->recv_buf, syn_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
@@ -252,13 +262,16 @@ int main(int argc, char **argv){
             }
         }
         //update timestamp
-        gettimeofday(&curr_time, NULL);
-        ikcp_update(kcp, (IUINT32)curr_time.tv_usec);
+        ikcp_update(kcp, iclock());
 
         max_fd = 0;
-        struct timeval timeout;
-        timeout.tv_sec = gts_args->beat_time;
-        timeout.tv_usec = 0;
+        if (stat_code == FLAG_SYN){
+            timeout.tv_sec = 1;
+            timeout.tv_usec = 0;
+        }else{
+            timeout.tv_sec = 0;
+            timeout.tv_usec = 20000;
+        }
         FD_ZERO(&readset);
         FD_SET(gts_args->tun, &readset);
         FD_SET(gts_args->UDP_sock, &readset);
@@ -295,41 +308,45 @@ int main(int argc, char **argv){
             }
 
             ikcp_input(kcp, gts_args->recv_buf, length);
-            length = ikcp_recv(kcp, gts_args->recv_buf, gts_args->mtu + GTS_HEADER_LEN);
-
-            DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_DECRYPT);
-            if (gts_header->ver != GTS_VER){
-                continue;
-            }
-            if (memcmp(gts_args->token[0], gts_header->token, TOKEN_LEN) != 0){
-                errf("token err");
-                continue;
-            }
-            if (gts_header->flag != FLAG_MSG){
-                stat_code = gts_header->flag;
-                if (stat_code != FLAG_OK){
-                    // errf("stat code : %d", stat_code);
+            while(1){
+                length = ikcp_recv(kcp, gts_args->recv_buf, gts_args->mtu + GTS_HEADER_LEN);
+                if(length <= 0){
+                    break;
                 }
-                continue;
-            }
-            if(gts_args->encrypt == 1) 
-                crypt_len = length - GTS_HEADER_LEN;
-            else
-                crypt_len = ENCRYPT_LEN;
-            if (-1 == crypto_decrypt(gts_args->recv_buf, gts_args->recv_buf,
-                                        crypt_len, key)){
-                errf("dropping invalid packet, maybe wrong password");
-                continue;
-            }
-            if (write(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // do nothing
-                } else if (errno == EPERM || errno == EINTR || errno == EINVAL) {
-                // just log, do nothing
-                err("write to tun");
-                } else {
-                err("write to tun");
-                break;
+                DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_DECRYPT);
+                if (gts_header->ver != GTS_VER){
+                    continue;
+                }
+                if (memcmp(gts_args->token[0], gts_header->token, TOKEN_LEN) != 0){
+                    errf("token err");
+                    continue;
+                }
+                if (gts_header->flag != FLAG_MSG){
+                    stat_code = gts_header->flag;
+                    if (stat_code != FLAG_OK){
+                        // errf("stat code : %d", stat_code);
+                    }
+                    continue;
+                }
+                if(gts_args->encrypt == 1) 
+                    crypt_len = length - GTS_HEADER_LEN;
+                else
+                    crypt_len = ENCRYPT_LEN;
+                if (-1 == crypto_decrypt(gts_args->recv_buf, gts_args->recv_buf,
+                                            crypt_len, key)){
+                    errf("dropping invalid packet, maybe wrong password");
+                    continue;
+                }
+                if (write(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // do nothing
+                    } else if (errno == EPERM || errno == EINTR || errno == EINVAL) {
+                    // just log, do nothing
+                    err("write to tun");
+                    } else {
+                    err("write to tun");
+                    break;
+                    }
                 }
             }
         }
@@ -360,25 +377,7 @@ int main(int argc, char **argv){
             crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, crypt_len, key);
             memcpy(gts_args->recv_buf, encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
 
-            ikcp_send(kcp, gts_args->recv_buf, length + GTS_HEADER_LEN);            
-
-            // if (sendto(gts_args->UDP_sock, gts_args->recv_buf,
-            //     length + GTS_HEADER_LEN, 0,
-            //     (struct sockaddr*)&gts_args->server_addr,
-            //     (socklen_t)sizeof(gts_args->server_addr)) == -1)
-            //     {
-            //         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            //             // do nothing
-            //         } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-            //                     errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-            //             // just log, do nothing
-            //             err("sendto");
-            //         } else {
-            //             err("sendto");
-            //             // TODO rebuild socket
-            //             break;
-            //         }
-            //     }
+            ikcp_send(kcp, gts_args->recv_buf, length + GTS_HEADER_LEN);
         }
         //recv from unix domain socket 
         if (FD_ISSET(gts_args->IPC_sock, &readset)){
