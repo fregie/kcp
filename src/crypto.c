@@ -22,7 +22,7 @@ int crypto_encrypt(unsigned char *c, unsigned char *m,
                    unsigned long long mlen, unsigned char *key) {
   unsigned char nonce[8];
   randombytes_buf(nonce, 8);
-  int r = crypto_secretbox_salsa208poly1305(c, m, mlen + 32, nonce, key);
+  int r = crypto_secretbox_salsa208poly1305(c, m, mlen, nonce, key);
   if (r != 0) return r;
   // copy nonce to the head
   memcpy(c + 8, nonce, 8);

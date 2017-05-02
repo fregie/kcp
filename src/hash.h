@@ -30,6 +30,8 @@ typedef struct {
   struct tm *expire;
   int over_date;
 
+  ikcpcb *kcp;
+
   UT_hash_handle hh1;
   UT_hash_handle hh2;
 } client_info_t;
@@ -45,6 +47,7 @@ typedef struct {
   client_info_t *ip_to_clients;
 } hash_ctx_t;
 
-int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args);
+int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args,
+              int (*output)(const char *buf, int len, struct IKCPCB *kcp, void *user));
 
 #endif

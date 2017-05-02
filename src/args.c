@@ -3,6 +3,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
+
+#ifndef IWORDS_BIG_ENDIAN
+    #ifdef _BIG_ENDIAN_
+        #if _BIG_ENDIAN_
+            #define IWORDS_BIG_ENDIAN 1
+        #endif
+    #endif
+    #ifndef IWORDS_BIG_ENDIAN
+        #if defined(__hppa__) || \
+            defined(__m68k__) || defined(mc68000) || defined(_M_M68K) || \
+            (defined(__MIPS__) && defined(__MISPEB__)) || \
+            defined(__ppc__) || defined(__POWERPC__) || defined(_M_PPC) || \
+            defined(__sparc__) || defined(__powerpc__) || \
+            defined(__mc68000__) || defined(__s390x__) || defined(__s390__)
+            #define IWORDS_BIG_ENDIAN 1
+        #endif
+    #endif
+    #ifndef IWORDS_BIG_ENDIAN
+        #define IWORDS_BIG_ENDIAN  0
+    #endif
+#endif
 
 int json_parse(gts_args_t *gts_args, char *filename){
     FILE *f;long len;char *data;
@@ -11,7 +33,9 @@ int json_parse(gts_args_t *gts_args, char *filename){
     len=ftell(f);
     fseek(f,0,SEEK_SET);
     data=(char*)malloc(len+1);
-    fread(data,1,len,f);
+    if(0 > fread(data,1,len,f)){
+        return -1;
+    }
     data[len]='\0';
     fclose(f);
     
@@ -104,6 +128,11 @@ int json_parse(gts_args_t *gts_args, char *filename){
     }else{
         gts_args->pid_file = strdup("/var/run/gts.pid");
     }
+    if (cJSON_HasObjectItem(json,"ipcfile") == 1 && cJSON_GetObjectItem(json,"ipcfile")->type == cJSON_String){
+        gts_args->ipc_file = cJSON_GetObjectItem(json,"ipcfile")->valuestring;
+    }else{
+        gts_args->ipc_file = strdup("/tmp/GTS.sock");
+    }
     if (cJSON_HasObjectItem(json,"intf") == 1 && cJSON_GetObjectItem(json,"intf")->type == cJSON_String){
         gts_args->intf = cJSON_GetObjectItem(json,"intf")->valuestring;
     }else{
@@ -139,6 +168,53 @@ int json_parse(gts_args_t *gts_args, char *filename){
         gts_args->mtu = cJSON_GetObjectItem(json,"mtu")->valueint;
     }else{
         gts_args->mtu = TUN_MTU;
+    }
+    if (cJSON_HasObjectItem(json,"out_intf") == 1 && cJSON_GetObjectItem(json,"out_intf")->type == cJSON_String){
+         gts_args->out_intf = cJSON_GetObjectItem(json,"out_intf")->valuestring;
+    }else{
+        if (gts_args->mode == GTS_MODE_SERVER){
+            //get out interface name ,for traffic contrl
+            gts_args->out_intf = malloc(MAX_INTF_LEN);
+            FILE *stream = popen("ip route show 0/0 | sed -e 's/.* dev \\([^ ]*\\).*/\\1/'", "r" );
+            if (fgets(gts_args->out_intf, MAX_INTF_LEN, stream) == NULL){
+                printf("get out interface failed, traffic control may not work");
+            }
+            pclose(stream);
+            char *temp =strchr(gts_args->out_intf, '\n');
+            if ( temp!= NULL) {*temp = 0;}
+            printf("output interface dev: %s\n", gts_args->out_intf);
+        }
+    }
+    if (gts_args->mode == GTS_MODE_CLIENT){
+        if (cJSON_HasObjectItem(json,"kcp_sndwnd") == 1 && cJSON_GetObjectItem(json,"kcp_sndwnd")->type == cJSON_Number)
+            encode_int32(&gts_args->kcp_conf.sndwnd, cJSON_GetObjectItem(json,"kcp_sndwnd")->valueint);
+        else
+            encode_int32(&gts_args->kcp_conf.sndwnd, KCP_DEFAULT_SNDWND);
+
+        if (cJSON_HasObjectItem(json,"kcp_rcvwnd") == 1 && cJSON_GetObjectItem(json,"kcp_rcvwnd")->type == cJSON_Number)
+            encode_int32(&gts_args->kcp_conf.rcvwnd, cJSON_GetObjectItem(json,"kcp_rcvwnd")->valueint);
+        else
+            encode_int32(&gts_args->kcp_conf.rcvwnd, KCP_DEFAULT_RCVWND);
+
+        if (cJSON_HasObjectItem(json,"kcp_nodelay") == 1 && cJSON_GetObjectItem(json,"kcp_nodelay")->type == cJSON_Number)
+            encode_int32(&gts_args->kcp_conf.nodelay, cJSON_GetObjectItem(json,"kcp_nodelay")->valueint);
+        else
+            encode_int32(&gts_args->kcp_conf.nodelay, KCP_DEFAULT_NODELAY);
+
+        if (cJSON_HasObjectItem(json,"kcp_interval") == 1 && cJSON_GetObjectItem(json,"kcp_interval")->type == cJSON_Number)
+            encode_int32(&gts_args->kcp_conf.interval, cJSON_GetObjectItem(json,"kcp_interval")->valueint);
+        else
+            encode_int32(&gts_args->kcp_conf.interval, KCP_DEFAULT_INTERVAL);
+
+        if (cJSON_HasObjectItem(json,"kcp_resend") == 1 && cJSON_GetObjectItem(json,"kcp_resend")->type == cJSON_Number)
+            encode_int32(&gts_args->kcp_conf.resend, cJSON_GetObjectItem(json,"kcp_resend")->valueint);
+        else
+            encode_int32(&gts_args->kcp_conf.resend, KCP_DEFAULT_RESEND);
+
+        if (cJSON_HasObjectItem(json,"kcp_nc") == 1 && cJSON_GetObjectItem(json,"kcp_nc")->type == cJSON_Number)
+            encode_int32(&gts_args->kcp_conf.nc, cJSON_GetObjectItem(json,"kcp_nc")->valueint);
+        else
+            encode_int32(&gts_args->kcp_conf.nc, KCP_DEFAULT_NC);
     }
     if (cJSON_HasObjectItem(json,"token") == 1){
         if (gts_args->mode == GTS_MODE_SERVER){
@@ -246,10 +322,31 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
     }
     gts_args->ver = GTS_VER;
     
-    gts_args->recv_buf = malloc(gts_args->mtu + GTS_HEADER_LEN);
-    gts_args->out_intf = malloc(MAX_INTF_LEN);
+    gts_args->recv_buf = malloc(MAX_MTU_LEN);
     
     gts_args->remote_addr_len = sizeof(gts_args->remote_addr);
     
     return 0;
+}
+
+void encode_int32(int *dst, int src){
+#if IWORDS_BIG_ENDIAN
+	*(unsigned char*)(dst + 0) = (unsigned char)((src >>  0) & 0xff);
+	*(unsigned char*)(dst + 1) = (unsigned char)((src >>  8) & 0xff);
+	*(unsigned char*)(dst + 2) = (unsigned char)((src >> 16) & 0xff);
+	*(unsigned char*)(dst + 3) = (unsigned char)((src >> 24) & 0xff);
+#else
+	*dst = src;
+#endif
+}
+
+void decode_int32(int *dst, int *src){
+#if IWORDS_BIG_ENDIAN
+	*dst = *(const unsigned char*)(src + 3);
+	*dst = *(const unsigned char*)(src + 2) + (*dst << 8);
+	*dst = *(const unsigned char*)(src + 1) + (*dst << 8);
+	*dst = *(const unsigned char*)(src + 0) + (*dst << 8);
+#else 
+	*dst = *src;
+#endif
 }

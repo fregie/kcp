@@ -107,7 +107,7 @@ int daemon_start(const gts_args_t *gts_args) {
 
 int daemon_stop(const gts_args_t *gts_args) {
   char buf[PID_BUF_SIZE];
-  int status, i, stopped;
+  int i, stopped;
   FILE *fp = fopen(gts_args->pid_file, "r");
   if (fp == NULL) {
     printf("not running\n");

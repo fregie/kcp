@@ -10,6 +10,7 @@
 //
 //=====================================================================
 #include "ikcp.h"
+#include "log.h"
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -357,7 +358,6 @@ int ikcp_recv(ikcpcb *kcp, char *buffer, int len)
 {
 	struct IQUEUEHEAD *p;
 	int ispeek = (len < 0)? 1 : 0;
-	int peeksize;
 	int recover = 0;
 	IKCPSEG *seg;
 	assert(kcp);
@@ -366,14 +366,6 @@ int ikcp_recv(ikcpcb *kcp, char *buffer, int len)
 		return -1;
 
 	if (len < 0) len = -len;
-
-	peeksize = ikcp_peeksize(kcp);
-
-	if (peeksize < 0) 
-		return -2;
-
-	if (peeksize > len) 
-		return -3;
 
 	if (kcp->nrcv_que >= kcp->rcv_wnd)
 		recover = 1;
@@ -404,14 +396,16 @@ int ikcp_recv(ikcpcb *kcp, char *buffer, int len)
 
 		if (fragment == 0) 
 			break;
+		//fregie hacked here:gts need to receive package one by one
+		break;
 	}
-
-	assert(len == peeksize);
 
 	// move available data from rcv_buf -> rcv_queue
 	while (! iqueue_is_empty(&kcp->rcv_buf)) {
 		IKCPSEG *seg = iqueue_entry(kcp->rcv_buf.next, IKCPSEG, node);
-		if (seg->sn == kcp->rcv_nxt && kcp->nrcv_que < kcp->rcv_wnd) {
+		//fregie hacked here:gts don't need package in order
+		//if (seg->sn == kcp->rcv_nxt && kcp->nrcv_que < kcp->rcv_wnd) {
+		if (kcp->nrcv_que < kcp->rcv_wnd) {
 			iqueue_del(&seg->node);
 			kcp->nrcv_buf--;
 			iqueue_add_tail(&seg->node, &kcp->rcv_queue);
@@ -551,7 +545,7 @@ static void ikcp_update_ack(ikcpcb *kcp, IINT32 rtt)
 		kcp->rx_srtt = (7 * kcp->rx_srtt + rtt) / 8;
 		if (kcp->rx_srtt < 1) kcp->rx_srtt = 1;
 	}
-	rto = kcp->rx_srtt + _imax_(1, 4 * kcp->rx_rttval);
+	rto = kcp->rx_srtt + _imax_(kcp->interval, 4 * kcp->rx_rttval);
 	kcp->rx_rto = _ibound_(kcp->rx_minrto, rto, IKCP_RTO_MAX);
 }
 
@@ -713,7 +707,9 @@ void ikcp_parse_data(ikcpcb *kcp, IKCPSEG *newseg)
 	// move available data from rcv_buf -> rcv_queue
 	while (! iqueue_is_empty(&kcp->rcv_buf)) {
 		IKCPSEG *seg = iqueue_entry(kcp->rcv_buf.next, IKCPSEG, node);
-		if (seg->sn == kcp->rcv_nxt && kcp->nrcv_que < kcp->rcv_wnd) {
+		//fregie hacked here:gts don't need package in order
+		//if (seg->sn == kcp->rcv_nxt && kcp->nrcv_que < kcp->rcv_wnd) {
+		if (kcp->nrcv_que < kcp->rcv_wnd) {
 			iqueue_del(&seg->node);
 			kcp->nrcv_buf--;
 			iqueue_add_tail(&seg->node, &kcp->rcv_queue);
@@ -749,7 +745,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 		ikcp_log(kcp, IKCP_LOG_INPUT, "[RI] %d bytes", size);
 	}
 
-	if (data == NULL || size < 24) return -1;
+	if (data == NULL || size < IKCP_OVERHEAD) return -1;
 
 	while (1) {
 		IUINT32 ts, sn, len, una, conv;
@@ -769,6 +765,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 		data = ikcp_decode32u(data, &sn);
 		data = ikcp_decode32u(data, &una);
 		data = ikcp_decode32u(data, &len);
+		errf("kcp sn: %d\nkcp rcv_nxt: %d", sn, kcp->rcv_nxt);
 
 		size -= IKCP_OVERHEAD;
 
@@ -808,25 +805,51 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 				ikcp_log(kcp, IKCP_LOG_IN_DATA, 
 					"input psh: sn=%lu ts=%lu", sn, ts);
 			}
-			if (_itimediff(sn, kcp->rcv_nxt + kcp->rcv_wnd) < 0) {
-				ikcp_ack_push(kcp, sn, ts);
-				if (_itimediff(sn, kcp->rcv_nxt) >= 0) {
-					seg = ikcp_segment_new(kcp, len);
-					seg->conv = conv;
-					seg->cmd = cmd;
-					seg->frg = frg;
-					seg->wnd = wnd;
-					seg->ts = ts;
-					seg->sn = sn;
-					seg->una = una;
-					seg->len = len;
-
-					if (len > 0) {
-						memcpy(seg->data, data, len);
-					}
-
-					ikcp_parse_data(kcp, seg);
+			if (sn == 0){
+				kcp->rcv_nxt = 0;
+				kcp->snd_nxt = 0;
+				kcp->nrcv_buf = 0;
+				kcp->nsnd_buf = 0;
+				kcp->nrcv_que = 0;
+				kcp->nsnd_que = 0;
+				while (! iqueue_is_empty(&kcp->rcv_buf)) {
+					IKCPSEG *seg = iqueue_entry(kcp->rcv_buf.next, IKCPSEG, node);
+					iqueue_del(&seg->node);
+					ikcp_segment_delete(kcp, seg);
 				}
+				while (! iqueue_is_empty(&kcp->rcv_queue)) {
+					IKCPSEG *seg = iqueue_entry(kcp->rcv_queue.next, IKCPSEG, node);
+					iqueue_del(&seg->node);
+					ikcp_segment_delete(kcp, seg);
+				}
+				while (! iqueue_is_empty(&kcp->snd_buf)) {
+					IKCPSEG *seg = iqueue_entry(kcp->snd_buf.next, IKCPSEG, node);
+					iqueue_del(&seg->node);
+					ikcp_segment_delete(kcp, seg);
+				}
+				while (! iqueue_is_empty(&kcp->snd_queue)) {
+					IKCPSEG *seg = iqueue_entry(kcp->snd_queue.next, IKCPSEG, node);
+					iqueue_del(&seg->node);
+					ikcp_segment_delete(kcp, seg);
+				}
+			}
+			ikcp_ack_push(kcp, sn, ts);
+			if (_itimediff(sn, kcp->rcv_nxt) >= 0) {
+				seg = ikcp_segment_new(kcp, len);
+				seg->conv = conv;
+				seg->cmd = cmd;
+				seg->frg = frg;
+				seg->wnd = wnd;
+				seg->ts = ts;
+				seg->sn = sn;
+				seg->una = una;
+				seg->len = len;
+
+				if (len > 0) {
+					memcpy(seg->data, data, len);
+				}
+
+				ikcp_parse_data(kcp, seg);
 			}
 		}
 		else if (cmd == IKCP_CMD_WASK) {

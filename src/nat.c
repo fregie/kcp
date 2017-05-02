@@ -11,6 +11,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/ip_icmp.h>
 
 #define ADD_CHECKSUM_32(acc, u32){ \
     acc += (u32) & 0xffff; \
@@ -125,6 +126,22 @@ client_info_t* nat_fix_downstream(hash_ctx_t *hash_ctx, unsigned char *buf, size
             }
             udp_hdr_t *udphdr = ip_payload;
             ADJUST_CHECKSUM(acc, udphdr->checksum);
+        }else if(iphdr->proto == IPPROTO_ICMP){
+            icmp_hdr_t *icmphdr = ip_payload;
+            if (buflen < iphdr_len + sizeof(*icmphdr)) {
+                errf("nat: icmp packet too short");
+                return NULL;
+            }
+            if (icmphdr->type == ICMP_UNREACH || icmphdr->type == ICMP_TIMXCEED) {
+                acc = 0;
+                ipv4_hdr_t *iphdr2 = ip_payload + sizeof(*icmphdr);
+                if (iphdr2->saddr ^ client->input_tun_ip) {
+                    ADD_CHECKSUM_32(acc, iphdr2->saddr);
+                    SUB_CHECKSUM_32(acc, client->input_tun_ip);
+                    iphdr2->saddr = client->input_tun_ip;
+                    ADJUST_CHECKSUM(acc, icmphdr->checksum);
+                }
+            }
         }else{
             errf("nat: not tcp and not udp");
         }

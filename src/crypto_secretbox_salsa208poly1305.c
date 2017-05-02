@@ -8,10 +8,9 @@ int crypto_secretbox_salsa208poly1305(
   const unsigned char *k
 )
 {
-  int i;
-  if (mlen < 32) return -1;
-  crypto_stream_salsa208_xor(c+32,m+32,mlen-32,n,k);
-  crypto_onetimeauth_poly1305(c + 16,c + 32,mlen - 32,k);
+  if (mlen < 0) return -1;
+  crypto_stream_salsa208_xor(c+32,m,mlen,n,k);
+  crypto_onetimeauth_poly1305(c + 16,c + 32,mlen,k);
   return 0;
 }
 
@@ -22,7 +21,6 @@ int crypto_secretbox_salsa208poly1305_open(
   const unsigned char *k
 )
 {
-  int i;
   // unsigned char subkey[32];
   if (clen < 32) return -1;
   // crypto_stream_salsa208(subkey,32,n,k);

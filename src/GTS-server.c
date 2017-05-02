@@ -3,14 +3,14 @@
 #include "daemon.h"
 #include "hash.h"
 #include "ikcp.h"
+#include "nat.h"
 #include <signal.h>
-#include <sys/time.h>
-#include "functions.h"
 
 #define MAX_IPC_LEN 500
 #define ACT_OK "{\"status\":\"ok\"}"
 #define ACT_FAILED "{\"status\":\"failed\"}"
 #define CHECK_TIME 300
+#define KCP_UPDATE_INTERVAL 100 //ms
 
 //time debug ------------------------
 clock_t select_time = 0;
@@ -25,24 +25,63 @@ clock_t set_paswd_time = 0;
 clock_t start_time = 0;
 clock_t end_time = 0;
 //------------------------------------
+static int udp_socket = 0;
+static int encrypt = 0;
+static int kcp_output(const char *buf, int len, ikcpcb *kcp, void *CLIENT){
+    client_info_t *client = CLIENT;
+    if (client->source_addr.addrlen == NO_SOURCE_ADDR){
+        errf("can't find source addr of client'");
+        return -1;
+    }
+    char send_buf[len+GTS_HEADER_LEN];
+    if (encrypt == 1){
+        crypto_encrypt((unsigned char*)send_buf, (unsigned char*)buf, len, client->key);
+    }else{
+        crypto_encrypt((unsigned char*)send_buf, (unsigned char*)buf, ENCRYPT_LEN, client->key);
+        memcpy(send_buf+GTS_HEADER_LEN+ENCRYPT_LEN, buf+ENCRYPT_LEN, len-ENCRYPT_LEN);
+    }
+    memcpy(send_buf, client->encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);//len = 8
+    if (client->txquota > UNLIMIT){
+        client->txquota -= len;
+    }
+    client->rx += len;
+    if ( -1 == sendto(udp_socket, send_buf, len + GTS_HEADER_LEN, 0,
+                (struct sockaddr*)&client->source_addr.addr,
+                (socklen_t)client->source_addr.addrlen)){
+        errf("sendto error");
+        return -1;
+    }
+    return 0;
+}
+
+static void parse_kcp_conf(client_info_t *client, kcp_conf_t *kcp_conf){
+    int sndwnd, rcvwnd, nodelay, interval, resend, nc;
+    decode_int32(&sndwnd, &kcp_conf->rcvwnd);
+    decode_int32(&rcvwnd, &kcp_conf->sndwnd); //client's send window = server's recieve window
+    decode_int32(&nodelay, &kcp_conf->nodelay);
+    decode_int32(&interval, &kcp_conf->interval);
+    decode_int32(&resend, &kcp_conf->resend);
+    decode_int32(&nc, &kcp_conf->nc);
+
+    ikcp_wndsize(client->kcp, sndwnd, rcvwnd);
+    ikcp_nodelay(client->kcp, nodelay, interval, resend, nc);
+}
 
 static char *shell_down = NULL;
-
-static int UDP_socket;
-static struct sockaddr_storage server_addr;
+static char *ipc_file = NULL;
 
 static void sig_handler(int signo) {
     /*errf("\nselect time: %d\nheader time: %d\nhash time: %d\ncrypt time: %d\npawd time: %d\nup time: %d\ndown time: %d",
           select_time/1000, header_time/1000, hash_time/1000, crypt_time/1000, set_paswd_time/1000, up_time/1000, down_time/1000);*/
-    system(shell_down);
-    unlink(IPC_FILE);
+    s_system(shell_down);
+    unlink(ipc_file);
     exit(0);
 }
 
 static int send_flag_msg(uint8_t flag, gts_args_t *gts_args, DES_key_schedule ks,
                         int length, struct sockaddr_storage temp_remote_addr,  
-                        socklen_t temp_remote_addrlen, gts_header_t *gts_header){
-    memset(gts_header + VER_LEN, flag, FLAG_LEN);
+                        socklen_t temp_remote_addrlen){
+    memset(gts_args->recv_buf + VER_LEN, flag, FLAG_LEN);
     DES_ecb_encrypt((const_DES_cblock*)gts_args->recv_buf, (DES_cblock*)gts_args->recv_buf, &ks, DES_ENCRYPT);
     if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
                     length, 0, (struct sockaddr*)&temp_remote_addr,
@@ -100,48 +139,17 @@ static void check_date(hash_ctx_t *ctx){
     }
 }
 
-static int udp_output(const char *buf, int len, ikcpcb *kcp, void *user){
-    addr_info_t *client_addr = (addr_info_t*)user;
-    if (sendto(UDP_socket, buf, len, 0,(struct sockaddr*)&client_addr->addr,
-               client_addr->addrlen) == -1)
-        {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // do nothing
-            } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-                        errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-                // just log, do nothing
-                err("sendto");
-            } else {
-                err("sendto");
-                return -1;
-            }
-        }
-        return 0;
-}
-
 int main(int argc, char **argv) {
     int ch;
     char *conf_file = NULL;
     char *act = "none";
-    int sndwnd = 128;
-    int rcvwnd = 128;
-    while ((ch = getopt(argc, argv, "c:d:s:r:v")) != -1){
+    while ((ch = getopt(argc, argv, "c:d:v")) != -1){
         switch (ch){
         case 'c':
             conf_file = strdup(optarg);
             break;
         case 'd':
             act = strdup(optarg);
-            break;
-        case 'r':
-            rcvwnd = atoi(optarg);
-            if(rcvwnd == 0)
-                rcvwnd = 128;
-            break;
-        case 's':
-            sndwnd = atoi(optarg);
-            if(sndwnd == 0)
-                sndwnd = 128;
             break;
         case 'v':
             printf("\nGTS-----------geewan transmit system\nversion: %s\n", GTS_RELEASE_VER);
@@ -196,8 +204,8 @@ int main(int argc, char **argv) {
     shell_down = malloc(strlen(gts_args->shell_down)+ 8);
     sprintf(shell_down, "sh %s", gts_args->shell_down);
     set_env(gts_args);
-    init_hash(hash_ctx, gts_args);
-    
+    init_hash(hash_ctx, gts_args, kcp_output);
+    encrypt = gts_args->encrypt;
     /*init header_key*/
     DES_key_schedule ks;
     DES_set_key_unchecked((const_DES_cblock*)gts_args->header_key, &ks);
@@ -208,18 +216,10 @@ int main(int argc, char **argv) {
     if (gts_args->UDP_sock == -1){
         return EXIT_FAILURE;
     }
-    UDP_socket = gts_args->UDP_sock;
+    udp_socket = gts_args->UDP_sock;
     gts_args->tun = tun_create(gts_args->intf);
-    gts_args->IPC_sock = init_IPC_socket();
-
-    //init kcp
-    addr_info_t *client_addr = malloc(sizeof(addr_info_t));
-    ikcpcb *kcp = ikcp_create(0x11223344, (void*)client_addr);
-    kcp->output = udp_output;
-    ikcp_wndsize(kcp, sndwnd, rcvwnd);
-    ikcp_nodelay(kcp, 1, 20, 2, 1);
-    kcp->rx_minrto = 10;
-    kcp->fastresend = 1;
+    ipc_file = gts_args->ipc_file;
+    gts_args->IPC_sock = init_IPC_socket(ipc_file);
 
     if (gts_args->tun < 0){
         errf("tun create failed!");
@@ -227,34 +227,32 @@ int main(int argc, char **argv) {
     }else{
         char *cmd = malloc(strlen(gts_args->shell_up) +8);
         sprintf(cmd, "sh %s", gts_args->shell_up);
-        system(cmd);
+        s_system(cmd);
         free(cmd);
-    }
-    //get out interface name ,for traffic contrl
-    FILE *stream = popen("ip route show 0/0 | sed -e 's/.* dev \\([^ ]*\\).*/\\1/'", "r" );
-    if (fgets(gts_args->out_intf, MAX_INTF_LEN, stream) == NULL){
-        errf("get out interface failed, traffic control may not work");
-    }
-    pclose(stream);
-    char *temp =strchr(gts_args->out_intf, '\n');
-    if ( temp!= NULL){
-        *temp = 0;
     }
     fd_set readset;
     int max_fd;
-    int crypt_len;
-    gts_header_t *gts_header = malloc(sizeof(gts_header_t));
-    time_t last_check_data = time(NULL) - CHECK_TIME;
     struct timeval timeout;
     timeout.tv_sec = 0;
-    timeout.tv_usec = 20000;
+    timeout.tv_usec = KCP_UPDATE_INTERVAL * 1000;
+    gts_header_t *gts_header = (gts_header_t*)gts_args->recv_buf;
+    kcp_conf_t * kcp_conf = NULL;
+    time_t last_check_data = time(NULL) - CHECK_TIME;
+    
+    if (-1 == fcntl(gts_args->UDP_sock, F_SETFL, O_NONBLOCK)){
+        errf("fcntl UDP_sock error!\n");
+        return -1;
+    }
+    if (-1 == fcntl(gts_args->tun, F_SETFL, O_NONBLOCK)){
+        errf("fcntl tun_fd error!\n");
+        return -1;
+    }
+
     while (1){
         if (time(NULL) - last_check_data >= CHECK_TIME){
             check_date(hash_ctx);
             last_check_data = time(NULL);
         }
-        ikcp_update(kcp, iclock());
-
         max_fd = 0;
         FD_ZERO(&readset);
         FD_SET(gts_args->tun, &readset);
@@ -269,16 +267,16 @@ int main(int argc, char **argv) {
         }
         
         //recv data from client
-        if (FD_ISSET(gts_args->UDP_sock, &readset)){
+        if (FD_ISSET(gts_args->UDP_sock, &readset)){while(1){
             struct sockaddr_storage temp_remote_addr;
             socklen_t temp_remote_addrlen = sizeof(temp_remote_addr);
             length = recvfrom(gts_args->UDP_sock, gts_args->recv_buf,
-                            gts_args->mtu + GTS_HEADER_LEN, 0,
+                            MAX_MTU_LEN, 0,
                             (struct sockaddr *)&temp_remote_addr,
                             &temp_remote_addrlen);
             if (length == -1){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    // do nothing
+                    break;
                 } else if (errno == ENETUNREACH || errno == ENETDOWN ||
                             errno == EPERM || errno == EINTR) {
                     // just log, do nothing
@@ -293,109 +291,100 @@ int main(int argc, char **argv) {
             }
             //decrypt header
             DES_ecb_encrypt((const_DES_cblock*)gts_args->recv_buf,
-                            (DES_cblock*)gts_header, &ks, DES_DECRYPT);
-            int result;
-            if (gts_header->ver != GTS_VER || gts_header->flag != FLAG_SYN){
-                result = ikcp_input(kcp, gts_args->recv_buf, length);
-            //**********************heart beat package*********************************************
-            }else{
-                client_info_t *client = NULL;
-                
-                HASH_FIND(hh1, hash_ctx->token_to_clients, gts_header->token, TOKEN_LEN, client);
-                if(client == NULL){
-                    if (-1 == send_flag_msg(FLAG_TOKEN_ERR, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen, gts_header)){
-                        break;
-                    }
-                    continue;
-                }
-                if(client->txquota <= 0 && client->txquota > UNLIMIT){
-                    if (-1 == send_flag_msg(FLAG_OVER_TXQUOTA, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen, gts_header)){
-                        break;
-                    }
+                            (DES_cblock*)gts_args->recv_buf, &ks, DES_DECRYPT);
+            if (gts_header->ver != GTS_VER){
                 continue;
-                }
-                if (client->over_date == OVER_DATE){
-                    if (-1 == send_flag_msg(FLAG_OVER_DATE, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen, gts_header)){
+            }
+            client_info_t *client = NULL;
+            
+            HASH_FIND(hh1, hash_ctx->token_to_clients, gts_header->token, TOKEN_LEN, client);
+            if(client == NULL){
+                if (gts_header->flag == FLAG_SYN){
+                    if (-1 == send_flag_msg(FLAG_TOKEN_ERR, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
                         break;
                     }
-                    continue;
                 }
-                //save source address
-                client_addr->addrlen = temp_remote_addrlen;
-                memcpy(&client_addr->addr, &temp_remote_addr, temp_remote_addrlen);
-                client->source_addr.addrlen = temp_remote_addrlen;
-                memcpy(&client->source_addr.addr, &temp_remote_addr, temp_remote_addrlen);
-                if (gts_args->encrypt == 1){
-                    crypt_len = length - GTS_HEADER_LEN;
-                }else{
-                    crypt_len = ENCRYPT_LEN;
-                }
-                if (-1 == crypto_decrypt(gts_args->recv_buf, gts_args->recv_buf,
-                                        crypt_len, client->key)){
-                    if (-1 == send_flag_msg(FLAG_PASSWORD_ERR, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen, gts_header)){
+                continue;
+            }
+            if(client->txquota <= 0 && client->txquota > UNLIMIT){
+                if (gts_header->flag == FLAG_SYN){
+                    if (-1 == send_flag_msg(FLAG_OVER_TXQUOTA, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
                         break;
                     }
-                    continue;
                 }
-                if (-1 == send_flag_msg(FLAG_OK, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen, gts_header)){
+                continue;
+            }
+            if (client->over_date == OVER_DATE){
+                if (gts_header->flag == FLAG_SYN){
+                    if (-1 == send_flag_msg(FLAG_OVER_DATE, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
+                        break;
+                    }
+                }
+                continue;
+            }
+            //save source address
+            client->source_addr.addrlen = temp_remote_addrlen;
+            memcpy(&client->source_addr.addr, &temp_remote_addr, temp_remote_addrlen);
+            int crypt_len = 0;
+            if (gts_args->encrypt == 1){
+                crypt_len = length - GTS_HEADER_LEN;
+            }else{
+                crypt_len = ENCRYPT_LEN;
+            }
+            if (-1 == crypto_decrypt(gts_args->recv_buf, gts_args->recv_buf,
+                                    crypt_len, client->key)){
+                if (gts_header->flag == FLAG_SYN){
+                    if (-1 == send_flag_msg(FLAG_PASSWORD_ERR, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
+                        break;
+                    }
+                }
+                continue;
+            }
+            if (gts_header->flag == FLAG_SYN){
+                kcp_conf = (kcp_conf_t*)(gts_args->recv_buf + GTS_HEADER_LEN);
+                parse_kcp_conf(client, kcp_conf);
+                if (-1 == send_flag_msg(FLAG_OK, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
                     break;
                 }
                 continue;
             }
-            //*************************************************************************************
+            //------- make sure the package is not flag package ,then add txquota --------
+            if (client->txquota > UNLIMIT){
+                client->txquota -= (length - GTS_HEADER_LEN);
+            }
+            client->tx += (length - GTS_HEADER_LEN);
+            //------------------------- write in kcp -----------------------------------------------
+            int result = ikcp_input(client->kcp, (char*)gts_args->recv_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
+            if (0 > result){
+                errf("ikcp input error");
+                continue;
+            }
+            ikcp_update(client->kcp, iclock());
             while(1){
-                length = ikcp_recv(kcp, gts_args->recv_buf, gts_args->mtu + GTS_HEADER_LEN);
-                if(length <= 0){
+                length = ikcp_recv(client->kcp, (char*)gts_args->recv_buf, MAX_MTU_LEN);
+                if (length == -1 || length == 0){
                     break;
                 }
-                DES_ecb_encrypt((const_DES_cblock*)gts_args->recv_buf,
-                                (DES_cblock*)gts_header, &ks, DES_DECRYPT);
-                client_info_t *client = NULL;
-                
-                HASH_FIND(hh1, hash_ctx->token_to_clients, gts_header->token, TOKEN_LEN, client);
-                if(client == NULL){
+                if (length < -1){
+                    errf("ikcp recv error: %d", length);
+                    break;
+                }
+                if (-1 == nat_fix_upstream(client, gts_args->recv_buf, length)){
+                    errf("nat error");
                     continue;
                 }
-                if(client->txquota <= 0 && client->txquota > UNLIMIT){
-                    continue;
-                }
-                if (client->over_date == OVER_DATE){
-                    continue;
-                }
-                //save source address
-                client_addr->addrlen = temp_remote_addrlen;
-                memcpy(&client_addr->addr, &temp_remote_addr, temp_remote_addrlen);
-                client->source_addr.addrlen = temp_remote_addrlen;
-                memcpy(&client->source_addr.addr, &temp_remote_addr, temp_remote_addrlen);
-                
-                if (gts_args->encrypt == 1){
-                    crypt_len = length - GTS_HEADER_LEN;
-                }else{
-                    crypt_len = ENCRYPT_LEN;
-                }
-                if (-1 == crypto_decrypt(gts_args->recv_buf, gts_args->recv_buf,
-                                        crypt_len, client->key)){
-                    continue;
-                }
-                if (client->txquota > UNLIMIT){
-                    client->txquota -= (length - GTS_HEADER_LEN);
-                }
-                client->tx += (length - GTS_HEADER_LEN);
-                if (-1 == nat_fix_upstream(client, gts_args->recv_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN)){
-                    continue;
-                }
-                if (write(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
+                if (write(gts_args->tun, gts_args->recv_buf, length) == -1){
                     errf("failed to write to tun");
                     continue;
                 }
             }
-        }
+            //--------------------------------------------------------------------------------------
         // recv data from tun
-        if (FD_ISSET(gts_args->tun, &readset)){
-            length = read(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, gts_args->mtu);
+        }}else if (FD_ISSET(gts_args->tun, &readset)){while(1){
+            length = read(gts_args->tun, gts_args->recv_buf, MAX_MTU_LEN-GTS_HEADER_LEN);
             if (length == -1){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // do nothing
+                break;
                 } else if (errno == EPERM || errno == EINTR) {
                 // just log, do nothing
                 err("read from tun");
@@ -405,51 +394,40 @@ int main(int argc, char **argv) {
                 }
             }
             client_info_t *client;
-            client = nat_fix_downstream(hash_ctx, gts_args->recv_buf+GTS_HEADER_LEN, length);
+            client = nat_fix_downstream(hash_ctx, gts_args->recv_buf, length);
             if (client == NULL){
                 continue;
             }
-            if (gts_args->encrypt ==1){
-                crypt_len = length;
-            }else{
-                crypt_len = ENCRYPT_LEN;
-            }
-            if (client->source_addr.addrlen == NO_SOURCE_ADDR){
-                errf("can't find source addr of client");
-                // should continue here,comment to test id the problem caused by this
+            if (0 > ikcp_send(client->kcp, (char*)gts_args->recv_buf, length)){
+                errf("kcp send error");
                 continue;
             }
-            crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf, crypt_len, client->key);
-            memcpy(gts_args->recv_buf, client->encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
-            if (client->txquota > UNLIMIT){
-                client->txquota -= length;
+            ikcp_update(client->kcp, iclock());
+        }}else if (FD_ISSET(gts_args->IPC_sock, &readset)){
+            char rx_buf[MAX_IPC_LEN];
+            bzero(rx_buf, MAX_IPC_LEN);
+            struct sockaddr_un pmapi_addr;
+            int len = sizeof(pmapi_addr);
+            recvfrom(gts_args->IPC_sock, rx_buf, sizeof(rx_buf), 0,
+                                    (struct sockaddr*)&pmapi_addr, (socklen_t *)&len);
+            int r = api_request_parse(hash_ctx, rx_buf, gts_args);
+            char *send_buf = NULL;
+            if (r == -1){
+                errf("action failed!");
+                send_buf = strdup(ACT_FAILED);
+            }else if(r == 0){
+                send_buf = strdup(ACT_OK);
+            }else if(r == 1){
+                send_buf = generate_stat_info(hash_ctx);
             }
-            client->rx += length;
-
-            server_addr = client->source_addr.addr;
-            ikcp_send(kcp, gts_args->recv_buf, length + GTS_HEADER_LEN);
-        }
-        // recv data from IPC
-        if (FD_ISSET(gts_args->IPC_sock, &readset)){
-                char rx_buf[MAX_IPC_LEN];
-                bzero(rx_buf, MAX_IPC_LEN);
-                struct sockaddr_un pmapi_addr;
-                int len = sizeof(pmapi_addr);
-                int recvSize = recvfrom(gts_args->IPC_sock, rx_buf, sizeof(rx_buf), 0,
-                                        (struct sockaddr*)&pmapi_addr, (socklen_t *)&len);
-                int r = api_request_parse(hash_ctx, rx_buf, gts_args);
-                char *send_buf;
-                if (r == -1){
-                    errf("action failed!");
-                    send_buf = strdup(ACT_FAILED);
-                }else if(r == 0){
-                    send_buf = strdup(ACT_OK);
-                }else if(r == 1){
-                    send_buf = generate_stat_info(hash_ctx);
-                }
-                sendto(gts_args->IPC_sock, send_buf, strlen(send_buf),0, (struct sockaddr*)&pmapi_addr, len);
-                free(send_buf);
-                check_date(hash_ctx);
+            sendto(gts_args->IPC_sock, send_buf, strlen(send_buf),0, (struct sockaddr*)&pmapi_addr, len);
+            free(send_buf);
+            check_date(hash_ctx);
+        }else{
+            client_info_t *client;
+            for(client = hash_ctx->token_to_clients; client != NULL; client=client->hh1.next){
+                ikcp_update(client->kcp, iclock());
+            }
         }
     }
     close(gts_args->UDP_sock);

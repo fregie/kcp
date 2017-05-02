@@ -1,5 +1,9 @@
 #include "action.h"
 
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/wait.h>
+#include <sys/types.h>
 
 #define PID_BUF_SIZE 32
 #define DATA_LEN 20
@@ -69,10 +73,10 @@ int init_UDP_socket(char* server_address, uint16_t server_port){
     return sock;
 }
 
-int init_IPC_socket(){
+int init_IPC_socket(char *ipc_filename){
     int pmmanager_fd, ret;
     socklen_t len;
-    struct sockaddr_un pmmanager_addr, pmapi_addr;
+    struct sockaddr_un pmmanager_addr;
     
     //create pmmanager socket fd
     pmmanager_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -80,10 +84,10 @@ int init_IPC_socket(){
     errf("cannot create pmmanager fd.");
     }
 
-    unlink(IPC_FILE);
+    unlink(ipc_filename);
     memset(&pmmanager_addr, 0, sizeof(pmmanager_addr));
     pmmanager_addr.sun_family = AF_UNIX;
-    strncpy(pmmanager_addr.sun_path, IPC_FILE, sizeof(pmmanager_addr.sun_path)-1);
+    strncpy(pmmanager_addr.sun_path, ipc_filename, sizeof(pmmanager_addr.sun_path)-1);
 
     //bind pmmanager_fd to pmmanager_addr
     ret = bind(pmmanager_fd, (struct sockaddr*)&pmmanager_addr, sizeof(pmmanager_addr));
@@ -120,6 +124,31 @@ unsigned char* encrypt_GTS_header(uint8_t *ver, char *token, uint8_t flag, DES_k
     return (unsigned char*)encrypted_header;
 }
 
+int s_system(char *cmd){
+    pid_t status;  
+    status = system(cmd);  
+
+    if(-1 == status){  
+        errf("system error!cmd: %s", cmd);  
+        return -1;
+    }else{  
+        if(WIFEXITED(status)){
+            if(0 == WEXITSTATUS(status)){  
+                return 0;
+            }  
+            else{  
+                errf("run cmd:%s fail, script exit code: %d", cmd, WEXITSTATUS(status));
+                return -1;
+            }
+        }else{
+            errf("execute cmd:%s exit status = [%d]",cmd, WEXITSTATUS(status));
+            return -1;
+        }  
+    }  
+  
+    return 0;  
+}
+
 #define MAX_IP_LENGTH 16
 #define MAX_CMD_LENGTH 200
 #define INFINITE -1
@@ -135,41 +164,42 @@ static void add_traffic_control(char* tun_name , char* out_intf_name,
     }
     char ip[MAX_IP_LENGTH];
     char cmd[MAX_CMD_LENGTH];
-    int client_id = output_ip - server_ip;
+    int client_id = ntohl(output_ip) - server_ip;
     unsigned char *bytes = (unsigned char*)&output_ip;
     snprintf(ip, sizeof(ip), "%d.%d.%d.%d", 
-             bytes[3],bytes[2],bytes[1],bytes[0]); //host, not net
+             bytes[0],bytes[1],bytes[2],bytes[3]); //host, not net
+    errf("add user: %s", ip);
     //control down stream
     if (down_limit != INFINITE && down_burst != INFINITE){
         snprintf(cmd, MAX_CMD_LENGTH,"tc class add dev %s parent 1: classid 1:%d htb rate %ldkbps ceil %ldkbps burst %ldk cburst %ldk",
                 tun_name, client_id, down_limit, down_limit*2, down_burst, down_burst);
-        system(cmd);
+        s_system(cmd);
 
         bzero(cmd, MAX_CMD_LENGTH);
         snprintf(cmd, MAX_CMD_LENGTH,"tc filter add dev %s parent 1: prio %d u32 match ip dst %s flowid 1:%d",
                 tun_name, client_id, ip, client_id);
-        system(cmd);
+        s_system(cmd);
     }
     //control up stream
     if (up_limit != INFINITE && up_burst != INFINITE){
         bzero(cmd, MAX_CMD_LENGTH);
         snprintf(cmd, MAX_CMD_LENGTH,"tc class add dev %s parent 1: classid 1:%d htb rate %ldkbps ceil %ldkbps burst %ldk cburst %ldk",
                 out_intf_name, client_id, up_limit, up_limit*2, up_burst, up_burst);
-        system(cmd);
+        s_system(cmd);
 
         bzero(cmd, MAX_CMD_LENGTH);
         snprintf(cmd, MAX_CMD_LENGTH, "tc filter add dev %s parent 1: protocol ip prio %d handle %d fw classid 1:%d",
                 out_intf_name, client_id, client_id, client_id);
-        system(cmd);
+        s_system(cmd);
         //set mark:id for up stream
         bzero(cmd, MAX_CMD_LENGTH);
         snprintf(cmd, MAX_CMD_LENGTH, "iptables -I PREROUTING -t mangle -p udp -s %s -j MARK --set-mark %d",
                 ip, client_id);
-        system(cmd);
+        s_system(cmd);
         bzero(cmd, MAX_CMD_LENGTH);
         snprintf(cmd, MAX_CMD_LENGTH, "iptables -I PREROUTING -t mangle -p tcp -s %s -j MARK --set-mark %d",
                 ip, client_id);
-        system(cmd);
+        s_system(cmd);
     }
 }
 
@@ -177,32 +207,32 @@ static void del_traffic_control(char* tun_name, char* out_intf_name,
                                 uint32_t server_ip, uint32_t output_ip){
     char ip[MAX_IP_LENGTH];
     char cmd[MAX_CMD_LENGTH];
-    int client_id = output_ip - server_ip;
+    int client_id = ntohl(output_ip) - server_ip;
     unsigned char *bytes = (unsigned char*)&output_ip;
     snprintf(ip, sizeof(ip), "%d.%d.%d.%d", 
              bytes[3],bytes[2],bytes[1],bytes[0]); //host, not net
     snprintf(cmd,MAX_CMD_LENGTH,"tc filter del dev %s parent 1: prio %d",tun_name, client_id);
-    system(cmd);
+    s_system(cmd);
 
     bzero(cmd, MAX_CMD_LENGTH);
     snprintf(cmd,MAX_CMD_LENGTH,"tc class del dev %s parent 1: classid 1:%d",tun_name, client_id);
-    system(cmd);
+    s_system(cmd);
 
     bzero(cmd, MAX_CMD_LENGTH);
     snprintf(cmd,MAX_CMD_LENGTH,"tc filter del dev %s parent 1: prio %d",out_intf_name, client_id);
-    system(cmd);
+    s_system(cmd);
 
     bzero(cmd, MAX_CMD_LENGTH);
     snprintf(cmd,MAX_CMD_LENGTH,"tc class del dev %s parent 1: classid 1:%d",out_intf_name, client_id);
-    system(cmd);
+    s_system(cmd);
 
     bzero(cmd, MAX_CMD_LENGTH);
     snprintf(cmd,MAX_CMD_LENGTH,"iptables -D PREROUTING -t mangle -p udp -s %s -j MARK --set-mark %d",ip, client_id);
-    system(cmd);
+    s_system(cmd);
 
     bzero(cmd, MAX_CMD_LENGTH);
     snprintf(cmd,MAX_CMD_LENGTH,"iptables -D PREROUTING -t mangle -p tcp -s %s -j MARK --set-mark %d",ip, client_id);
-    system(cmd);
+    s_system(cmd);
 }
 
 int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
@@ -347,7 +377,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             down_burst = INFINITE;
         }
             add_traffic_control(gts_args->intf, (char*)gts_args->out_intf,
-                                gts_args->netip, ntohl(client->output_tun_ip), 
+                                gts_args->netip, client->output_tun_ip, 
                                 up_limit, up_burst, down_limit, down_burst);
         HASH_ADD(hh1, ctx->token_to_clients, token, TOKEN_LEN, client);
         HASH_ADD(hh2, ctx->ip_to_clients, output_tun_ip, 4, client);
@@ -375,7 +405,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             return -1;
         }
         // errf("outout ip: %u", client->output_tun_ip);
-        del_traffic_control(gts_args->intf, (char*)gts_args->out_intf, gts_args->netip, ntohl(client->output_tun_ip));
+        del_traffic_control(gts_args->intf, (char*)gts_args->out_intf, gts_args->netip, client->output_tun_ip);
         HASH_DELETE(hh1,ctx->token_to_clients, client);
         HASH_DELETE(hh2,ctx->ip_to_clients, client);
         free(client->encrypted_header);
@@ -511,5 +541,30 @@ int set_env(gts_args_t *gts_args){
     if (-1 == setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1)){
         err("setenv");
     }
+    if (gts_args->mode == GTS_MODE_SERVER){
+        if (-1 == setenv("out_intf", gts_args->out_intf, 1)){
+            err("setenv");
+        }
+    }
     return 0;
+}
+
+static inline void itimeofday(long *sec, long *usec){
+	struct timeval time;
+	gettimeofday(&time, NULL);
+	if (sec) *sec = time.tv_sec;
+	if (usec) *usec = time.tv_usec;
+}
+
+/* get clock in millisecond 64 */
+static inline IINT64 iclock64(void){
+	long s, u;
+	IINT64 value;
+	itimeofday(&s, &u);
+	value = ((IINT64)s) * 1000 + (u / 1000);
+	return value;
+}
+
+IUINT32 iclock(){
+	return (IUINT32)(iclock64() & 0xfffffffful);
 }

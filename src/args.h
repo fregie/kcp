@@ -4,6 +4,7 @@
 #include "cJSON.h"
 #include "log.h"
 #include "crypto.h"
+#include "ikcp.h"
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -26,17 +27,22 @@
 #define MAX_USER 255
 
 #define GTS_VER 1
-#define GTS_RELEASE_VER "1.1.0"
+#define GTS_RELEASE_VER "1.2.1"
+
+#define MAX_MTU_LEN 1500
 
 #define IPC_FILE "/tmp/GTS.sock"
 #define TUN_MTU 1432  // 1492 (Ethernet) - 20 (IPv4, or 40 for IPv6) - 8 (UDP) - 32 (GTS header)
 #define GTS_HEADER_LEN 32
+#define KCP_CONF_LEN 32
+#define IKCP_HEAD_LEN 24
 #define VER_LEN 1
 #define FLAG_LEN 1
 #define TOKEN_LEN 6
 #define NONCE_LEN 8
 #define AUTH_INFO_LEN 16
 #define HEADER_KEY_LEN 8
+
 
 #define ENCRYPT_LEN 16 //if not set encrypt, will encrypt 16 bytes for checking password
 
@@ -49,6 +55,13 @@
 #define FLAG_OVER_TXQUOTA 6
 #define FLAG_OVER_DATE 7
 #define FLAG_NO_RESPONSE 8
+
+#define KCP_DEFAULT_SNDWND 256
+#define KCP_DEFAULT_RCVWND 256
+#define KCP_DEFAULT_NODELAY 0
+#define KCP_DEFAULT_INTERVAL 40
+#define KCP_DEFAULT_RESEND 0
+#define KCP_DEFAULT_NC  0
 
 /*               GTS_header 32bytes
 0        8        16                              63
@@ -65,10 +78,20 @@
 typedef struct{
   uint8_t ver;
   uint8_t flag;
-  char token[6];
-  char nonce[8];
-  char auth_info[16];
+  char token[TOKEN_LEN];
+  char nonce[NONCE_LEN];
+  char auth_info[AUTH_INFO_LEN];
 } gts_header_t;
+
+typedef struct{
+  int sndwnd;
+  int rcvwnd;
+  int nodelay;
+  int interval;
+  int resend;
+  int nc;
+  char not_use[8];
+} kcp_conf_t; // 32 byte = RANDOM_MSG_LEN
 
 typedef enum{
     GTS_MODE_SERVER = 1,
@@ -107,11 +130,17 @@ typedef struct{
   char *auth_info;
   
   uint32_t netip;
-  
+
+  kcp_conf_t kcp_conf;
+
   char *log_file;
   char *pid_file;
+  char *ipc_file;
 } gts_args_t;
 
 int init_gts_args(gts_args_t *gts_args, char *conf_file);
+
+void encode_int32(int *dst, int src);
+void decode_int32(int *dst, int* src);
 
 #endif
