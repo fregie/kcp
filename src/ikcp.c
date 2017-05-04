@@ -805,6 +805,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 				ikcp_log(kcp, IKCP_LOG_IN_DATA, 
 					"input psh: sn=%lu ts=%lu", sn, ts);
 			}
+			/*--------fregie hacked here:reconnect kcp if one peer restart--------*/
 			if (sn == 0){
 				kcp->rcv_nxt = 0;
 				kcp->snd_nxt = 0;
@@ -833,6 +834,7 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 					ikcp_segment_delete(kcp, seg);
 				}
 			}
+			/*----------------------------------------------------------------------*/
 			ikcp_ack_push(kcp, sn, ts);
 			if (_itimediff(sn, kcp->rcv_nxt) >= 0) {
 				seg = ikcp_segment_new(kcp, len);

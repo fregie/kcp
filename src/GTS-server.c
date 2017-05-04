@@ -410,7 +410,7 @@ int main(int argc, char **argv) {
             int len = sizeof(pmapi_addr);
             recvfrom(gts_args->IPC_sock, rx_buf, sizeof(rx_buf), 0,
                                     (struct sockaddr*)&pmapi_addr, (socklen_t *)&len);
-            int r = api_request_parse(hash_ctx, rx_buf, gts_args);
+            int r = api_request_parse(hash_ctx, rx_buf, gts_args, kcp_output);
             char *send_buf = NULL;
             if (r == -1){
                 errf("action failed!");

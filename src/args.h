@@ -62,6 +62,7 @@
 #define KCP_DEFAULT_INTERVAL 40
 #define KCP_DEFAULT_RESEND 0
 #define KCP_DEFAULT_NC  0
+#define KCP_DEFAULT_MINRTO 10
 
 /*               GTS_header 32bytes
 0        8        16                              63

@@ -32,13 +32,14 @@ int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args,
         client->kcp = ikcp_create(*conv, (void*)client);
         client->kcp->output = output;
         ikcp_setmtu(client->kcp, gts_args->mtu + IKCP_HEAD_LEN);
-        ikcp_wndsize(client->kcp, 256, 256);
+        ikcp_wndsize(client->kcp, KCP_DEFAULT_SNDWND, KCP_DEFAULT_RCVWND);
         // 第二个参数 nodelay-启用以后若干常规加速将启动
 		// 第三个参数 interval为内部处理时钟，默认设置为 10ms
 		// 第四个参数 resend为快速重传指标，设置为2
 		// 第五个参数 为是否禁用常规流控，这里禁止
-        ikcp_nodelay(client->kcp, 1, 10, 2, 1);
-        client->kcp->rx_minrto = 10;
+        ikcp_nodelay(client->kcp, KCP_DEFAULT_NODELAY, KCP_DEFAULT_INTERVAL,
+                                  KCP_DEFAULT_RESEND, KCP_DEFAULT_NC);
+        client->kcp->rx_minrto = KCP_DEFAULT_MINRTO;
         client->kcp->fastresend = 1;
         
         // add to hash: ctx->token_to_clients[token] = client

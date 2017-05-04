@@ -235,7 +235,8 @@ static void del_traffic_control(char* tun_name, char* out_intf_name,
     s_system(cmd);
 }
 
-int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
+int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args,
+                      int (*output)(const char *buf, int len, struct IKCPCB *kcp, void *user)){
     char *act;
     cJSON *json;
     json = cJSON_Parse(data);
@@ -379,6 +380,21 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
             add_traffic_control(gts_args->intf, (char*)gts_args->out_intf,
                                 gts_args->netip, client->output_tun_ip, 
                                 up_limit, up_burst, down_limit, down_burst);
+
+        IUINT32 *conv = (IUINT32*)client->token;
+        client->kcp = ikcp_create(*conv, (void*)client);
+        client->kcp->output = output;
+        ikcp_setmtu(client->kcp, gts_args->mtu + IKCP_HEAD_LEN);
+        ikcp_wndsize(client->kcp, KCP_DEFAULT_SNDWND, KCP_DEFAULT_RCVWND);
+        // 第二个参数 nodelay-启用以后若干常规加速将启动
+		// 第三个参数 interval为内部处理时钟，默认设置为 10ms
+		// 第四个参数 resend为快速重传指标，设置为2
+		// 第五个参数 为是否禁用常规流控，这里禁止
+        ikcp_nodelay(client->kcp, KCP_DEFAULT_NODELAY, KCP_DEFAULT_INTERVAL,
+                                  KCP_DEFAULT_RESEND, KCP_DEFAULT_NC);
+        client->kcp->rx_minrto = KCP_DEFAULT_MINRTO;
+        client->kcp->fastresend = 1;
+
         HASH_ADD(hh1, ctx->token_to_clients, token, TOKEN_LEN, client);
         HASH_ADD(hh2, ctx->ip_to_clients, output_tun_ip, 4, client);
         cJSON_Delete(json);
@@ -409,7 +425,8 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args){
         HASH_DELETE(hh1,ctx->token_to_clients, client);
         HASH_DELETE(hh2,ctx->ip_to_clients, client);
         free(client->encrypted_header);
-        free(client->expire);   
+        free(client->expire);
+        ikcp_release(client->kcp);
         free(client);
     }else if(strcmp(act,"show_stat") == 0){
         cJSON_Delete(json);
