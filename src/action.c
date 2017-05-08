@@ -566,7 +566,7 @@ int set_env(gts_args_t *gts_args){
     return 0;
 }
 
-static inline void itimeofday(long *sec, long *usec){
+static void itimeofday(long *sec, long *usec){
 	struct timeval time;
 	gettimeofday(&time, NULL);
 	if (sec) *sec = time.tv_sec;
@@ -574,7 +574,7 @@ static inline void itimeofday(long *sec, long *usec){
 }
 
 /* get clock in millisecond 64 */
-static inline IINT64 iclock64(void){
+static IINT64 iclock64(void){
 	long s, u;
 	IINT64 value;
 	itimeofday(&s, &u);

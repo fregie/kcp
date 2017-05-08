@@ -765,7 +765,6 @@ int ikcp_input(ikcpcb *kcp, const char *data, long size)
 		data = ikcp_decode32u(data, &sn);
 		data = ikcp_decode32u(data, &una);
 		data = ikcp_decode32u(data, &len);
-		errf("kcp sn: %d\nkcp rcv_nxt: %d", sn, kcp->rcv_nxt);
 
 		size -= IKCP_OVERHEAD;
 

@@ -26,8 +26,8 @@
 
 #define MAX_USER 255
 
-#define GTS_VER 1
-#define GTS_RELEASE_VER "1.2.1"
+#define GTS_VER 2
+#define GTS_RELEASE_VER "2.0.0"
 
 #define MAX_MTU_LEN 1500
 
@@ -55,6 +55,8 @@
 #define FLAG_OVER_TXQUOTA 6
 #define FLAG_OVER_DATE 7
 #define FLAG_NO_RESPONSE 8
+
+#define KCP_UPDATE_INTERVAL 1000 //ms
 
 #define KCP_DEFAULT_SNDWND 256
 #define KCP_DEFAULT_RCVWND 256

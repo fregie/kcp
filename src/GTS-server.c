@@ -10,7 +10,6 @@
 #define ACT_OK "{\"status\":\"ok\"}"
 #define ACT_FAILED "{\"status\":\"failed\"}"
 #define CHECK_TIME 300
-#define KCP_UPDATE_INTERVAL 100 //ms
 
 //time debug ------------------------
 clock_t select_time = 0;
@@ -233,8 +232,6 @@ int main(int argc, char **argv) {
     fd_set readset;
     int max_fd;
     struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = KCP_UPDATE_INTERVAL * 1000;
     gts_header_t *gts_header = (gts_header_t*)gts_args->recv_buf;
     kcp_conf_t * kcp_conf = NULL;
     time_t last_check_data = time(NULL) - CHECK_TIME;
@@ -253,6 +250,8 @@ int main(int argc, char **argv) {
             check_date(hash_ctx);
             last_check_data = time(NULL);
         }
+        timeout.tv_sec = 0;
+        timeout.tv_usec = KCP_UPDATE_INTERVAL * 1000;
         max_fd = 0;
         FD_ZERO(&readset);
         FD_SET(gts_args->tun, &readset);

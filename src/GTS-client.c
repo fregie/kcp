@@ -27,8 +27,6 @@ clock_t write_time = 0;
 clock_t start_time = 0;
 clock_t end_time = 0;
 //------------------------------------
-static unsigned int recv_pkg_num = 0;
-static unsigned int send_pkg_num = 0;
 
 static char *shell_down = NULL;
 static char *ipc_file = NULL;
@@ -41,7 +39,6 @@ static int udp_socket = 0;
 static int encrypt = 0;
 static int kcp_output(const char *buf, int len, ikcpcb *kcp, void *GTS_ARGS){
     gts_args_t *gts_args = (gts_args_t*)GTS_ARGS;
-    errf("output len: %d", len);
     char send_buf[len+GTS_HEADER_LEN];
     if (encrypt == 1){
         crypto_encrypt((unsigned char*)send_buf, (unsigned char*)buf, len, key);
@@ -202,8 +199,6 @@ int main(int argc, char **argv){
     fd_set readset;
     int max_fd;
     struct timeval timeout;
-    timeout.tv_sec = gts_args->beat_time;
-    timeout.tv_usec = 0;
     //init kcp
     IUINT32 *conv = (IUINT32*)gts_args->token[0];
     ikcpcb *kcp = ikcp_create(*conv, (void*)gts_args);
@@ -264,6 +259,8 @@ int main(int argc, char **argv){
                 }
             }
         }
+        timeout.tv_sec = 0;
+        timeout.tv_usec = KCP_UPDATE_INTERVAL * 1000;
         max_fd = 0;
         FD_ZERO(&readset);
         FD_SET(gts_args->tun, &readset);
@@ -296,7 +293,7 @@ int main(int argc, char **argv){
                 }
             }
             if (length == 0){
-                continue;
+                break;
             }
             DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_DECRYPT);
             if (gts_header->ver != GTS_VER){
@@ -343,17 +340,15 @@ int main(int argc, char **argv){
                 }
             }
             //--------------------------------------------------------------------------------------
-        }}
         //read from tun and send to server
-        if (FD_ISSET(gts_args->tun, &readset)){
-            while(1){
+        }}else if (FD_ISSET(gts_args->tun, &readset)){while(1){
                 length = read(gts_args->tun, gts_args->recv_buf, MAX_MTU_LEN-GTS_HEADER_LEN);
                 if (time(NULL) - last_recv_time >=5*gts_args->beat_time ){
                     stat_code = FLAG_NO_RESPONSE;
                     errf("can't recv server response");
                     // continue;
                 }
-                if (length == -1){
+                if (length == -1 || length == 0){
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
                         break;
                     } else if (errno == EPERM || errno == EINTR) {
@@ -370,9 +365,8 @@ int main(int argc, char **argv){
                 }
                 ikcp_update(kcp, iclock());
             }
-        }
         //recv from unix domain socket 
-        if (FD_ISSET(gts_args->IPC_sock, &readset)){
+        }else if (FD_ISSET(gts_args->IPC_sock, &readset)){
             char rx_buf[MAX_IPC_LEN];
             // bzero(rx_buf, MAX_IPC_LEN);
             struct sockaddr_un pmapi_addr;
@@ -423,6 +417,8 @@ int main(int argc, char **argv){
                 continue;
             }
             free(json);
+        }else{
+            ikcp_update(kcp, iclock());
         }
     }
     
