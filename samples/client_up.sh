@@ -11,8 +11,8 @@ iptables -I FORWARD 1 -i $intf -m state --state RELATED,ESTABLISHED -j ACCEPT
 iptables -I FORWARD 1 -o $intf -j ACCEPT
 
 ip route add $net dev $intf
-ip route add 0/1 dev $intf
-ip route add 128/1 dev $intf
+# ip route add 0/1 dev $intf
+# ip route add 128/1 dev $intf
 
 ip route add $server via $(ip route show 0/0 | sed -e 's/.* via \([^ ]*\).*/\1/')
 

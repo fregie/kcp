@@ -11,5 +11,6 @@
     "shell_up":"/etc/gts/server_up.sh",
     "shell_down":"/etc/gts/server_down.sh",
     "logfile":"/var/log/GTS-server.log",
-    "pidfile":"/var/run/gts.pid"
+    "pidfile":"/var/run/gts.pid",
+    "ipcfile":"/tmp/gts.sock"
 }

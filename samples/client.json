@@ -18,5 +18,6 @@
     "shell_up":"/etc/gts/client_up.sh",
     "shell_down":"/etc/gts/client_down.sh",
     "logfile":"/var/log/GTS-client.log",
-    "pidfile":"/var/run/gts.pid"
+    "pidfile":"/var/run/gts.pid",
+    "ipcfile":"/tmp/gts.sock"
 }

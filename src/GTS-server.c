@@ -11,6 +11,9 @@
 #define ACT_FAILED "{\"status\":\"failed\"}"
 #define CHECK_TIME 300
 
+#define GTS_VER_1 1
+#define GTS_VER_2 2
+
 //time debug ------------------------
 clock_t select_time = 0;
 clock_t up_time = 0;
@@ -39,7 +42,11 @@ static int kcp_output(const char *buf, int len, ikcpcb *kcp, void *CLIENT){
         crypto_encrypt((unsigned char*)send_buf, (unsigned char*)buf, ENCRYPT_LEN, client->key);
         memcpy(send_buf+GTS_HEADER_LEN+ENCRYPT_LEN, buf+ENCRYPT_LEN, len-ENCRYPT_LEN);
     }
-    memcpy(send_buf, client->encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);//len = 8
+    if (client->ver == GTS_VER_1){
+        memcpy(send_buf, client->v1_encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
+    }else{
+        memcpy(send_buf, client->encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);//len = 8
+    }
     if (client->txquota > UNLIMIT){
         client->txquota -= len;
     }
@@ -291,7 +298,7 @@ int main(int argc, char **argv) {
             //decrypt header
             DES_ecb_encrypt((const_DES_cblock*)gts_args->recv_buf,
                             (DES_cblock*)gts_args->recv_buf, &ks, DES_DECRYPT);
-            if (gts_header->ver != GTS_VER){
+            if (gts_header->ver != GTS_VER_1 && gts_header->ver != GTS_VER_2){
                 continue;
             }
             client_info_t *client = NULL;
@@ -339,9 +346,13 @@ int main(int argc, char **argv) {
                 }
                 continue;
             }
+            //update client gts version
+            client->ver = gts_header->ver;
             if (gts_header->flag == FLAG_SYN){
-                kcp_conf = (kcp_conf_t*)(gts_args->recv_buf + GTS_HEADER_LEN);
-                parse_kcp_conf(client, kcp_conf);
+                if (client->ver == GTS_VER_2){
+                    kcp_conf = (kcp_conf_t*)(gts_args->recv_buf + GTS_HEADER_LEN);
+                    parse_kcp_conf(client, kcp_conf);
+                }
                 if (-1 == send_flag_msg(FLAG_OK, gts_args, ks, length, temp_remote_addr, temp_remote_addrlen)){
                     break;
                 }
@@ -352,6 +363,18 @@ int main(int argc, char **argv) {
                 client->txquota -= (length - GTS_HEADER_LEN);
             }
             client->tx += (length - GTS_HEADER_LEN);
+            //------- compate gts version 1 ---------------------------
+            if (client->ver == GTS_VER_1){
+                if (-1 == nat_fix_upstream(client, gts_args->recv_buf + GTS_HEADER_LEN, length - GTS_HEADER_LEN)){
+                    errf("nat up error");
+                    continue;
+                }
+                if (write(gts_args->tun, gts_args->recv_buf + GTS_HEADER_LEN, length - GTS_HEADER_LEN) == -1){
+                    errf("failed to write to tun");
+                    continue;
+                }
+                continue;
+            }
             //------------------------- write in kcp -----------------------------------------------
             int result = ikcp_input(client->kcp, (char*)gts_args->recv_buf+GTS_HEADER_LEN, length - GTS_HEADER_LEN);
             if (0 > result){
@@ -395,6 +418,11 @@ int main(int argc, char **argv) {
             client_info_t *client;
             client = nat_fix_downstream(hash_ctx, gts_args->recv_buf, length);
             if (client == NULL){
+                continue;
+            }
+            //compatie gts ver 1
+            if (client->ver == GTS_VER_1){
+                kcp_output((char*)gts_args->recv_buf, length, NULL, (void*)client);
                 continue;
             }
             if (0 > ikcp_send(client->kcp, (char*)gts_args->recv_buf, length)){

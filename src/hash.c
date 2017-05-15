@@ -11,11 +11,15 @@ int init_hash(hash_ctx_t *ctx, gts_args_t *gts_args,
         client_info_t *client = malloc(sizeof(client_info_t));
         bzero(client, sizeof(client_info_t));
 
+        client->ver = GTS_VER;
         memcpy(client->token, gts_args->token[i], TOKEN_LEN);
         crypto_generichash(client->key, sizeof client->key, 
                             (unsigned char *)gts_args->password[i],
                             strlen(gts_args->password[i]), NULL, 0);
         client->encrypted_header = encrypt_GTS_header(&gts_args->ver, gts_args->token[i], FLAG_MSG, &ks);
+        //version 1.x.x gts header
+        uint8_t ver_1 = 1;
+        client->v1_encrypted_header = encrypt_GTS_header(&ver_1, gts_args->token[i], FLAG_MSG, &ks);
         // assign IP based on tun IP and user tokens
         // for example:
         //     tun IP is 10.7.0.1

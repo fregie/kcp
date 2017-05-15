@@ -255,6 +255,7 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args,
         client_info_t *client = malloc(sizeof(client_info_t));
         client_info_t *temp_client = NULL;
         bzero(client, sizeof(client_info_t));
+        client->ver = GTS_VER;
         if (cJSON_HasObjectItem(json,"token") == 1){
             char *token = cJSON_GetObjectItem(json,"token")->valuestring;
             int p = 0;
@@ -295,6 +296,8 @@ int api_request_parse(hash_ctx_t *ctx, char *data, gts_args_t *gts_args,
         DES_key_schedule ks;
         DES_set_key_unchecked((const_DES_cblock*)gts_args->header_key, &ks);
         client->encrypted_header = encrypt_GTS_header(&gts_args->ver, client->token, FLAG_MSG, &ks);
+        uint8_t ver_1 = 1;
+        client->v1_encrypted_header = encrypt_GTS_header(&ver_1, client->token, FLAG_MSG, &ks);
         client->rx = 0;
         client->tx = 0;
         client->over_date = 0;

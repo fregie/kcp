@@ -15,9 +15,11 @@ typedef struct {
 
 typedef struct {
   int id;
+  uint8_t ver;
   char token[TOKEN_LEN];
   unsigned char key[32];
   unsigned char* encrypted_header;
+  unsigned char* v1_encrypted_header;
   // source address of UDP
   addr_info_t source_addr;
   // input tun IP
