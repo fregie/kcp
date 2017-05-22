@@ -77,6 +77,15 @@ int json_parse(gts_args_t *gts_args, char *filename){
         gts_args->encrypt = 0;
         printf("encrypt: no\n");
     }
+    if (gts_args->mode == GTS_MODE_CLIENT){
+        if (cJSON_HasObjectItem(json,"ver") == 1 && cJSON_GetObjectItem(json,"ver")->type == cJSON_Number){
+            gts_args->ver = cJSON_GetObjectItem(json,"ver")->valueint;
+        }else{
+            gts_args->ver = GTS_VER_1;
+        }
+    }else{
+        gts_args->ver = GTS_VER;
+    }
     if (cJSON_HasObjectItem(json,"beat_time") == 1 && cJSON_GetObjectItem(json,"beat_time")->type == cJSON_Number){
         gts_args->beat_time = cJSON_GetObjectItem(json,"beat_time")->valueint;
         printf("beat time: %ds\n", gts_args->beat_time);
@@ -320,8 +329,6 @@ int init_gts_args(gts_args_t *gts_args,char *conf_file){
         printf("unknow mode");
         return -1;
     }
-    gts_args->ver = GTS_VER;
-    
     gts_args->recv_buf = malloc(MAX_MTU_LEN);
     
     gts_args->remote_addr_len = sizeof(gts_args->remote_addr);

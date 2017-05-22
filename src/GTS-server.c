@@ -11,9 +11,6 @@
 #define ACT_FAILED "{\"status\":\"failed\"}"
 #define CHECK_TIME 300
 
-#define GTS_VER_1 1
-#define GTS_VER_2 2
-
 //time debug ------------------------
 clock_t select_time = 0;
 clock_t up_time = 0;

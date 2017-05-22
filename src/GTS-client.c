@@ -296,8 +296,8 @@ int main(int argc, char **argv){
                 break;
             }
             DES_ecb_encrypt((const_DES_cblock*)gts_header, (DES_cblock*)gts_header, &ks, DES_DECRYPT);
-            if (gts_header->ver != GTS_VER){
-                continue;
+            if (gts_header->ver != gts_args->ver){
+                // continue;
             }
             if (memcmp(gts_args->token[0], gts_header->token, TOKEN_LEN) != 0){
                 errf("token err");
@@ -317,6 +317,13 @@ int main(int argc, char **argv){
             if (-1 == crypto_decrypt(gts_args->recv_buf, gts_args->recv_buf,
                                         crypt_len, key)){
                 errf("dropping invalid packet, maybe wrong password");
+                continue;
+            }
+            if (gts_args->ver == GTS_VER_1){
+                if (write(gts_args->tun, gts_args->recv_buf+GTS_HEADER_LEN, length-GTS_HEADER_LEN) == -1){
+                    errf("failed to write to tun");
+                    continue;
+                }
                 continue;
             }
             //------------------------- write in kcp -----------------------------------------------
@@ -358,6 +365,10 @@ int main(int argc, char **argv){
                     err("read from tun");
                     break;
                     }
+                }
+                if (gts_args->ver == GTS_VER_1){
+                    kcp_output((char*)gts_args->recv_buf, length, NULL, (void*)gts_args);
+                    continue;
                 }
                 if (0 > ikcp_send(kcp, (char*)gts_args->recv_buf, length)){
                     errf("kcp send error");

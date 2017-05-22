@@ -29,6 +29,9 @@
 #define GTS_VER 2
 #define GTS_RELEASE_VER "2.0.0"
 
+#define GTS_VER_1 1
+#define GTS_VER_2 2
+
 #define MAX_MTU_LEN 1500
 
 #define IPC_FILE "/tmp/GTS.sock"

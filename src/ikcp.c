@@ -404,8 +404,8 @@ int ikcp_recv(ikcpcb *kcp, char *buffer, int len)
 	while (! iqueue_is_empty(&kcp->rcv_buf)) {
 		IKCPSEG *seg = iqueue_entry(kcp->rcv_buf.next, IKCPSEG, node);
 		//fregie hacked here:gts don't need package in order
-		//if (seg->sn == kcp->rcv_nxt && kcp->nrcv_que < kcp->rcv_wnd) {
-		if (kcp->nrcv_que < kcp->rcv_wnd) {
+		if (seg->sn == kcp->rcv_nxt && kcp->nrcv_que < kcp->rcv_wnd) {
+		// if (kcp->nrcv_que < kcp->rcv_wnd) {
 			iqueue_del(&seg->node);
 			kcp->nrcv_buf--;
 			iqueue_add_tail(&seg->node, &kcp->rcv_queue);
@@ -708,8 +708,8 @@ void ikcp_parse_data(ikcpcb *kcp, IKCPSEG *newseg)
 	while (! iqueue_is_empty(&kcp->rcv_buf)) {
 		IKCPSEG *seg = iqueue_entry(kcp->rcv_buf.next, IKCPSEG, node);
 		//fregie hacked here:gts don't need package in order
-		//if (seg->sn == kcp->rcv_nxt && kcp->nrcv_que < kcp->rcv_wnd) {
-		if (kcp->nrcv_que < kcp->rcv_wnd) {
+		if (seg->sn == kcp->rcv_nxt && kcp->nrcv_que < kcp->rcv_wnd) {
+		// if (kcp->nrcv_que < kcp->rcv_wnd) {
 			iqueue_del(&seg->node);
 			kcp->nrcv_buf--;
 			iqueue_add_tail(&seg->node, &kcp->rcv_queue);
