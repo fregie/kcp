@@ -48,11 +48,18 @@ static int kcp_output(const char *buf, int len, ikcpcb *kcp, void *CLIENT){
         client->txquota -= len;
     }
     client->rx += len;
-    if ( -1 == sendto(udp_socket, send_buf, len + GTS_HEADER_LEN, 0,
-                (struct sockaddr*)&client->source_addr.addr,
-                (socklen_t)client->source_addr.addrlen)){
-        errf("sendto error");
-        return -1;
+    while (1){
+        if ( -1 == sendto(udp_socket, send_buf, len + GTS_HEADER_LEN, 0,
+                    (struct sockaddr*)&client->source_addr.addr,
+                    (socklen_t)client->source_addr.addrlen)){
+            if (errno == EAGAIN || errno == EWOULDBLOCK){
+                continue;
+            }else{
+                errf("sendto error : %d", errno);
+            }
+            return -1;
+        }
+        break;
     }
     return 0;
 }
@@ -86,18 +93,18 @@ static int send_flag_msg(uint8_t flag, gts_args_t *gts_args, DES_key_schedule ks
                         socklen_t temp_remote_addrlen){
     memset(gts_args->recv_buf + VER_LEN, flag, FLAG_LEN);
     DES_ecb_encrypt((const_DES_cblock*)gts_args->recv_buf, (DES_cblock*)gts_args->recv_buf, &ks, DES_ENCRYPT);
-    if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
-                    length, 0, (struct sockaddr*)&temp_remote_addr,
-                    (socklen_t)temp_remote_addrlen))
-    {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-                    errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-            err("sendto");
-        } else {
-            err("sendto");
+    while (1){
+        if ( -1 == sendto(gts_args->UDP_sock, gts_args->recv_buf,
+                        length, 0, (struct sockaddr*)&temp_remote_addr,
+                        (socklen_t)temp_remote_addrlen)){
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            } else {
+                errf("sendto: %d", errno);
+            }
             return -1;
         }
+        break;
     }
     return 0;
 }
@@ -403,13 +410,13 @@ int main(int argc, char **argv) {
             length = read(gts_args->tun, gts_args->recv_buf, MAX_MTU_LEN-GTS_HEADER_LEN);
             if (length == -1){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                break;
+                    break;
                 } else if (errno == EPERM || errno == EINTR) {
-                // just log, do nothing
-                err("read from tun");
+                    // just log, do nothing
+                    err("read from tun");
                 } else {
-                err("read from tun");
-                break;
+                    err("read from tun");
+                    break;
                 }
             }
             client_info_t *client;

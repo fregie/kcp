@@ -47,11 +47,18 @@ static int kcp_output(const char *buf, int len, ikcpcb *kcp, void *GTS_ARGS){
         memcpy(send_buf+GTS_HEADER_LEN+ENCRYPT_LEN, buf+ENCRYPT_LEN, len-ENCRYPT_LEN);
     }
     memcpy(send_buf, encrypted_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
-    if (sendto(udp_socket, send_buf, len + GTS_HEADER_LEN, 0,
-               (struct sockaddr*)&gts_args->server_addr,
-               (socklen_t)sizeof(gts_args->server_addr)) == -1){
-        errf("send error");
-        return -1;
+    while (1){
+        if (sendto(udp_socket, send_buf, len + GTS_HEADER_LEN, 0,
+                (struct sockaddr*)&gts_args->server_addr,
+                (socklen_t)sizeof(gts_args->server_addr)) == -1){
+            if (errno == EAGAIN || errno == EWOULDBLOCK){
+                continue;
+            }else{
+                errf("sendto error : %d", errno);
+            }
+            return -1;
+        }
+        break;
     }
     return 0;
 }
@@ -241,22 +248,20 @@ int main(int argc, char **argv){
                 crypt_len = ENCRYPT_LEN;
             }
             crypto_encrypt(gts_args->recv_buf, gts_args->recv_buf+GTS_HEADER_LEN, crypt_len, key);
-            if (sendto(gts_args->UDP_sock, gts_args->recv_buf,
-                RANDOM_MSG_LEN + GTS_HEADER_LEN, 0,
-                (struct sockaddr*)&gts_args->server_addr,
-                (socklen_t)sizeof(gts_args->server_addr)) == -1)
-            {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    // do nothing
-                } else if (errno == ENETUNREACH || errno == ENETDOWN ||
-                            errno == EPERM || errno == EINTR || errno == EMSGSIZE) {
-                    // just log, do nothing
-                    err("sendto");
-                } else {
-                    err("sendto");
-                    // TODO rebuild socket
-                    break;
+            while (1){
+                if (sendto(gts_args->UDP_sock, gts_args->recv_buf,
+                    RANDOM_MSG_LEN + GTS_HEADER_LEN, 0,
+                    (struct sockaddr*)&gts_args->server_addr,
+                    (socklen_t)sizeof(gts_args->server_addr)) == -1)
+                {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        continue;
+                    } else {
+                        errf("sendto: %d", errno);
+                    }
+                    return -1;
                 }
+                break;
             }
         }
         timeout.tv_sec = 0;

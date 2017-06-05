@@ -167,7 +167,7 @@ static void add_traffic_control(char* tun_name , char* out_intf_name,
     int client_id = ntohl(output_ip) - server_ip;
     unsigned char *bytes = (unsigned char*)&output_ip;
     snprintf(ip, sizeof(ip), "%d.%d.%d.%d", 
-             bytes[0],bytes[1],bytes[2],bytes[3]); //host, not net
+             bytes[0],bytes[1],bytes[2],bytes[3]); //net, not host
     errf("add user: %s", ip);
     //control down stream
     if (down_limit != INFINITE && down_burst != INFINITE){
@@ -210,7 +210,7 @@ static void del_traffic_control(char* tun_name, char* out_intf_name,
     int client_id = ntohl(output_ip) - server_ip;
     unsigned char *bytes = (unsigned char*)&output_ip;
     snprintf(ip, sizeof(ip), "%d.%d.%d.%d", 
-             bytes[3],bytes[2],bytes[1],bytes[0]); //host, not net
+             bytes[0],bytes[1],bytes[2],bytes[3]); //host, not net
     snprintf(cmd,MAX_CMD_LENGTH,"tc filter del dev %s parent 1: prio %d",tun_name, client_id);
     s_system(cmd);
 
