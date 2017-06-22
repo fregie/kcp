@@ -5,7 +5,8 @@ This version is **kcp** available version,and GTS version is up to 2.0.0
 
 ## 兼容性
 服务端兼容 2.0.0 以及 1.x 版本的客户端
-客户端配置增加了一个ver字段，连接1.x版本服务端时需将这个字段设置为1，连接2.0.0版本服务端时设置为2
+客户端配置增加了一个ver字段，连接1.x版本服务端时需将这个字段设置为1，连接2.0.0版本服务端时设置为2  
+**注意**：如果不配置合适的mtu效果会很差，建议mtu：出口MTU大小减去92(1500-92=1408)
 
 # 安装
 linux：  v
@@ -60,12 +61,12 @@ server.json:
     {
     "server":"0.0.0.0",                         # 服务器ip
     "port":6666,                                # 服务器监听端口
-    "header key":"1234ABCE",                    # 用来解密头部信息的key
+    "header key":"1234ABCE",                    # 用来解密头部信息的key，长度不限，可以使用任意字符
     "token":["ff593b9abeb1","ff593b9abeb2"],    # 用来区分客户端的 6 byte HEX 信息，
                                                   使用命令 xxd -l 8 -p /dev/random 生成
-    "password":["geewantest1","geewantest2"],   # 按顺序token对应的密码
+    "password":["geewantest1","geewantest2"],   # 按顺序token对应的密码，长度不限，可以使用任意字符
     "intf":"GTSs_tun",                          # 生成虚拟借口的名称
-    "mtu":1408,                                 # 虚拟接口的 MTU, 建议mtu：出口MTU大小减去92
+    "mtu":1408,                                 # 虚拟接口的 MTU, 建议mtu：出口MTU大小减去92(1500-92=1408)
     "net":"10.1.0.1/24",                        # 虚拟借口的ip和子网掩码
     "encrypt":1,                                # 是否对payload部分进行加密（openwrt版本消耗性能较大）
     "shell_up":"/etc/GTS/server_up.sh",         # 启动脚本路径
@@ -124,7 +125,7 @@ client.json:
     {
         "act":"add_user",               # 添加用户
         "token":"b88d9ad8eabb",         # 添加用户的token
-        "password":"789632145",         # 添加用户的pasword
+        "password":"789632145",         # 添加用户的pasword,长度不限，可以使用任意字符
         "txquota":"1024",               # 允许用户消耗的流量（KB）(-1为无限制)
         "expire":"2016/01/02 12:12:00", # 允许用户在该日期前使用
         "up_limit":512,                 # 对用于进行上行流控(KBps)(-1为无限制)
