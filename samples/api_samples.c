@@ -20,10 +20,10 @@
 \"txquota\":10240000,\"expire\":\"2018/6/3 14:57:00\"}"
 #define DEL_USER "{\"act\":\"del_user\",\"token\":\"b88d9ad8eab2\"}"
 #define SHOW_STAT "{\"act\":\"show_stat\"}"
-char *msg_to_send = ADD_USER;
+char *msg_to_send = SHOW_STAT;
 
 //define unix domain socket path
-#define pmmanager "/tmp/GTS.sock"
+#define pmmanager "/tmp/gts.sock"
 #define pmapi "/tmp/pmapi"
 
 int main(int argc, char** argv)

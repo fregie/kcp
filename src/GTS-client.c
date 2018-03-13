@@ -243,7 +243,7 @@ int main(int argc, char **argv){
             memcpy(gts_args->recv_buf + GTS_HEADER_LEN, &gts_args->kcp_conf, KCP_CONF_LEN);
             memcpy(gts_args->recv_buf, syn_header, VER_LEN+FLAG_LEN+TOKEN_LEN);
             if (gts_args->encrypt == 1){
-                crypt_len = length;
+                crypt_len = KCP_CONF_LEN;
             }else{
                 crypt_len = ENCRYPT_LEN;
             }
